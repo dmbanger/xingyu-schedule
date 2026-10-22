@@ -97,6 +97,44 @@ test('备份验证：无效节次不得被接受，重复ID不能互相覆盖',(
   const result=C.normalizeCourses([course({id:'same'}),course({name:'另一门课',id:'same'})]);assert.notEqual(result[0].id,result[1].id);
   assert.equal(C.normalizeCourses([course(),course()]).length,1);
 });
+test('正方课表：课程名 / 教师 / 周次 / 节次 / 地点 分行的单元格',()=>{
+  const rows=[header,row(cell('第1节'),cell('高等数学A\n张三\n1-16周\n1-2节\n教101'),...Array.from({length:6},()=>cell()))];
+  const out=C.parseSchoolSnapshot({tables:[{rows}]});
+  assert.equal(out.courses.length,1);
+  const c=out.courses[0];
+  assert.deepEqual([c.name,c.teacher,c.room,c.day,c.start,c.end],['高等数学A','张三','教101',1,1,2]);
+  assert.deepEqual(c.weeks,[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]);
+  assert.deepEqual(out.warnings,[]);
+});
+test('正方课表：一个格子用空行分隔两门课、单周写法与空格标签',()=>{
+  const twoCourses=cell('大学英语\n李四\n1-8周\n3-4节\n教201\n\n数据结构\n王五\n1-16周(单)\n5-6节\n地点 实验楼301');
+  const rows=[header,row(cell('第3节'),twoCourses,...Array.from({length:6},()=>cell()))];
+  const out=C.parseSchoolSnapshot({tables:[{rows}]});
+  assert.equal(out.courses.length,2);
+  const english=out.courses.find(c=>c.name==='大学英语'),data=out.courses.find(c=>c.name==='数据结构');
+  assert.deepEqual([english.teacher,english.room,english.start,english.end],['李四','教201',3,4]);
+  assert.deepEqual(english.weeks,[1,2,3,4,5,6,7,8]);
+  assert.deepEqual([data.teacher,data.room],[ '王五','实验楼301']);
+  assert.deepEqual(data.weeks,[1,3,5,7,9,11,13,15]);
+});
+test('学校预设：包含北化正方入口，未知预设回落到通用',()=>{
+  const buct=C.schoolPreset('buct');
+  assert.equal(buct.url,'http://jwglxt.buct.edu.cn');
+  assert.match(buct.label,/北京化工大学/);
+  assert.equal(C.schoolPreset('missing').id,'generic');
+  assert.ok(C.SCHOOL_PRESETS.length>=3);
+});
+test('旧版内置学校默认值会被迁移，用户自定义学校名保持不变',()=>{
+  const migrated=C.sanitizeState({courses:[],settings:{schoolName:'北京邮电大学',schoolUrl:'https://auth.bupt.edu.cn/',semesterStart:'2026-09-07'}});
+  assert.equal(migrated.settings.schoolName,'我的学校');
+  assert.equal(migrated.settings.schoolUrl,'');
+  assert.equal(migrated.settings.schoolPreset,'generic');
+  const kept=C.sanitizeState({courses:[],settings:{schoolName:'某某大学',schoolUrl:'https://jw.example.edu.cn/'}});
+  assert.equal(kept.settings.schoolName,'某某大学');
+  assert.equal(kept.settings.schoolUrl,'https://jw.example.edu.cn/');
+  assert.equal(C.defaultState().settings.schoolName,'我的学校');
+  assert.equal(C.defaultState().settings.schoolUrl,'');
+});
 test('教学周和日期校验：周日仍属于同一周，周一进入下一周',()=>{
   assert.equal(C.weekAt('2026-09-07',new Date(2026,8,13)),1);
   assert.equal(C.weekAt('2026-09-07',new Date(2026,8,14)),2);

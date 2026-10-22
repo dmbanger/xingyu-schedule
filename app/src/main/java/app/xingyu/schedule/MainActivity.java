@@ -127,7 +127,7 @@ public final class MainActivity extends Activity {
             close.setOnClickListener(v->hideSchool());refresh.setOnClickListener(v->schoolView.reload());captureButton.setOnClickListener(v->captureSchool());
             desktopToggle.setOnCheckedChangeListener((button,checked)->{desktopMode=checked;getSharedPreferences("browser",MODE_PRIVATE).edit().putBoolean("desktop_mode",checked).apply();if(schoolView!=null){schoolView.stopLoading();applySchoolBrowserMode();schoolView.reload();message(checked?"桌面模式已开启，当前页面会重新加载":"已切换手机模式，当前页面会重新加载");}});
             schoolPanel.addView(bar);
-            TextView hint=new TextView(this);hint.setText("登录 → 打开整学期个人课表 → 识别。排版不全时开启桌面模式，可双指缩放；切换模式会刷新页面。");hint.setTextSize(12);hint.setTextColor(Color.rgb(97,83,147));hint.setPadding(dp(12),dp(6),dp(12),dp(6));schoolPanel.addView(hint);
+            TextView hint=new TextView(this);hint.setText("登录 → 打开整学期课表（个人课表 / 学生课表）→ 识别。排版不全时开启桌面模式，可双指缩放；切换模式会刷新页面。");hint.setTextSize(12);hint.setTextColor(Color.rgb(97,83,147));hint.setPadding(dp(12),dp(6),dp(12),dp(6));schoolPanel.addView(hint);
             schoolAddress=new TextView(this);schoolAddress.setTextSize(11);schoolAddress.setPadding(16,4,16,10);schoolAddress.setMaxLines(2);schoolPanel.addView(schoolAddress);
             schoolAddress.setOnClickListener(v->{EditText edit=new EditText(this);edit.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_VARIATION_URI);edit.setText(schoolView.getUrl());new AlertDialog.Builder(this).setTitle("前往教务网址").setView(edit).setPositiveButton("前往",(d,w)->{String next=edit.getText().toString().trim();if(validWebUrl(next))schoolView.loadUrl(next);else message("网址无效");}).setNegativeButton("取消",null).show();});
             schoolView=new WebView(this);

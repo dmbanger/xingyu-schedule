@@ -42,6 +42,20 @@ const {pathToFileURL}=require('node:url');
   await page.evaluate(text=>window.receiveImportFile(text),fs.readFileSync(path.join(__dirname,'../examples/qiangzhi-demo.html'),'utf8'));
   assert.equal(await page.locator('.preview-course').count(),3);
   await page.locator('[data-action="close"]').click();
+  // 正方 demo: one cell holds two courses separated by a blank line, one of them is 单周.
+  await page.evaluate(text=>window.receiveImportFile(text),fs.readFileSync(path.join(__dirname,'../examples/zhengfang-demo.html'),'utf8'));
+  assert.equal(await page.locator('.preview-course').count(),4);
+  const zfText=await page.locator('.import-preview').innerText();
+  assert.ok(zfText.includes('实验楼301')&&zfText.includes('教305'),'正方合并单元格拆分');
+  assert.ok(zfText.includes('1,3,5,7,9,11,13,15'),'正方单周');
+  await page.locator('[data-action="close"]').click();
+  // School presets: 北化 正方 entry prefills the URL and no school-specific copy remains.
+  await page.locator('#navigation [data-tab="import"]').click();
+  await page.locator('#school-preset').selectOption('buct');
+  assert.equal(await page.locator('#school-url').inputValue(),'http://jwglxt.buct.edu.cn');
+  assert.ok((await page.locator('.import-hero .badge').innerText()).includes('正方'));
+  assert.ok(!(await page.locator('body').innerText()).includes('北京邮电大学'),'不应残留单一学校的文案');
+  await page.locator('#school-preset').selectOption('generic');
   // Input values, scripts, and hidden login forms must not be captured by the school extractor.
   const school=await context.newPage();await school.setContent('<form><input value="private-password"></form><table><tr><td>星期一</td></tr><tr><td>课程甲<br><span title="教师">王老师</span><br>1-16周[01-02节]<br><span title="教室">教三201</span></td></tr></table>');
   const script=require('../app/src/main/assets/core.js').snapshotScript();
@@ -61,6 +75,6 @@ const {pathToFileURL}=require('node:url');
   await desktopTest.evaluate(fs.readFileSync(path.join(__dirname,'../app/src/main/assets/desktop-viewport.js'),'utf8'));
   await desktopTest.waitForFunction(()=>innerWidth>=1280);assert.equal(await desktopTest.locator('meta[name="viewport"]').getAttribute('content'),'width=1280');
   assert.deepEqual(errors,[]);
-  fs.writeFileSync(path.join(output,'ui-smoke-result.json'),JSON.stringify({passed:true,checks:['empty state','demo isolation','course creation','reload persistence','themes','CSV preview and replace','import rollback','school extractor excludes form values','untrusted text rendering','phone widths'],pageErrors:errors},null,2));
-  console.log('UI smoke: 10 flows passed; screenshots: '+output);await browser.close();
+  fs.writeFileSync(path.join(output,'ui-smoke-result.json'),JSON.stringify({passed:true,checks:['empty state','demo isolation','course creation','reload persistence','themes','CSV preview and replace','import rollback','强智 demo import','正方 demo import with 单周 and merged cell','school preset prefills 北化 正方 entry, no single-school copy','school extractor excludes form values','untrusted text rendering','phone widths'],pageErrors:errors},null,2));
+  console.log('UI smoke: 13 flows passed; screenshots: '+output);await browser.close();
 })().catch(e=>{console.error(e);process.exit(1);});

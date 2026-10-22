@@ -1,6 +1,14 @@
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.ScheduleCore=api;})(typeof globalThis!=='undefined'?globalThis:this,function(){
   'use strict';
   const MAX_WEEKS=40, MAX_PERIODS=24;
+  // School presets only prefill the login entry. Every school can still type its own URL.
+  const SCHOOL_PRESETS=[
+    {id:'generic',label:'通用：手动填写教务网址',badge:'多校适配 · 正方 / 强智',url:'',hint:'填写你学校的教务入口网址。识别读取页面里的课表表格，正方、强智等常见教务系统都可以尝试；结构特殊的页面可能需要继续适配。'},
+    {id:'buct',label:'北京化工大学 · 正方教务',badge:'正方教务 · 已预置北化入口',url:'http://jwglxt.buct.edu.cn',hint:'已预置北京化工大学教务管理系统入口，会跳转学校统一身份认证。登录后进入“教务管理系统 → 信息查询 → 学生课表”，显示整学期课表后点“识别课表”。'},
+    {id:'zhengfang',label:'其他学校 · 正方教务',badge:'正方教务',url:'',hint:'正方教务：登录后进入“信息查询 → 学生课表 / 我的课表”，选对学期、显示整学期课表后识别。'},
+    {id:'qiangzhi',label:'其他学校 · 强智教务',badge:'强智教务',url:'',hint:'强智教务：登录后进入“个人课表 / 学期理论课表”，选对学期、显示整学期课表后识别。'}
+  ];
+  function schoolPreset(id){return SCHOOL_PRESETS.find(p=>p.id===id)||SCHOOL_PRESETS[0];}
   function uid(){return 'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);}
   function parseWeeks(input,max=MAX_WEEKS){
     if(Array.isArray(input)){
@@ -45,14 +53,18 @@
   function dateString(d){return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');}
   function parseDate(s){if(!/^\d{4}-\d{2}-\d{2}$/.test(s||''))throw new Error('日期格式无效');const [y,m,d]=s.split('-').map(Number),v=new Date(y,m-1,d);if(dateString(v)!==s)throw new Error('日期无效');return v;}
   function weekAt(start,now=new Date()){const a=monday(parseDate(start)),b=monday(now);return Math.round((Date.UTC(b.getFullYear(),b.getMonth(),b.getDate())-Date.UTC(a.getFullYear(),a.getMonth(),a.getDate()))/604800000)+1;}
-  function defaultState(){return {version:1,courses:[],settings:{schoolName:'北京邮电大学',schoolUrl:'https://auth.bupt.edu.cn/',semesterStart:dateString(monday()),semesterConfigured:false,totalWeeks:20,periods:12,theme:'starlight',background:'builtin',cardOpacity:88,times:['08:00-08:45','08:50-09:35','09:50-10:35','10:40-11:25','11:30-12:15','13:30-14:15','14:20-15:05','15:20-16:05','16:10-16:55','18:30-19:15','19:20-20:05','20:10-20:55']}};}
+  function defaultState(){return {version:1,courses:[],settings:{schoolName:'我的学校',schoolUrl:'',schoolPreset:'generic',semesterStart:dateString(monday()),semesterConfigured:false,totalWeeks:20,periods:12,theme:'starlight',background:'builtin',cardOpacity:88,times:['08:00-08:45','08:50-09:35','09:50-10:35','10:40-11:25','11:30-12:15','13:30-14:15','14:20-15:05','15:20-16:05','16:10-16:55','18:30-19:15','19:20-20:05','20:10-20:55']}};}
   function sanitizeState(raw){
     const d=defaultState();if(!raw||typeof raw!=='object')return d;d.courses=normalizeCourses(raw.courses||[]);const s=raw.settings||{};
     for(const key of ['schoolName','schoolUrl'])if(typeof s[key]==='string')d.settings[key]=s[key].slice(0,500);
+    // 0.1.x shipped with one example school baked in; old installs are migrated to the neutral default.
+    if(d.settings.schoolName==='北京邮电大学')d.settings.schoolName='我的学校';
+    if(/^https?:\/\/auth\.bupt\.edu\.cn\/?$/.test(d.settings.schoolUrl))d.settings.schoolUrl='';
     try{parseDate(s.semesterStart);d.settings.semesterStart=s.semesterStart;}catch(_){}
     d.settings.semesterConfigured=s.semesterConfigured===true;
     for(const [key,min,max] of [['totalWeeks',1,40],['periods',1,24],['cardOpacity',35,100]])if(Number.isInteger(Number(s[key]))&&Number(s[key])>=min&&Number(s[key])<=max)d.settings[key]=Number(s[key]);
     if(['starlight','sakura','night'].includes(s.theme))d.settings.theme=s.theme;
+    if(SCHOOL_PRESETS.some(p=>p.id===s.schoolPreset))d.settings.schoolPreset=s.schoolPreset;
     if(['builtin','custom','none'].includes(s.background))d.settings.background=s.background;
     if(Array.isArray(s.times)&&s.times.length<=24&&s.times.every(t=>validTimeRange(t)))d.settings.times=s.times;
     return d;
@@ -114,14 +126,35 @@
     const parsedWeeks=parseWeeks(weekMatches.flatMap(m=>parseWeeks(m[0])));
     const periods=parsePeriodRanges(lines.filter(x=>/节/.test(x)).join(' '))||fallbackPeriods;
     if(!periods)throw new Error('无法识别节次：'+lines[0]);
-    const labeled=(kind)=>{const l=lines.find(s=>new RegExp('^(?:【)?(?:'+kind+')(?:】|[:：])').test(s));return l?l.replace(new RegExp('^(?:【)?(?:'+kind+')(?:】|[:：])\s*'),''):'';};
-    const name=labeled('课程|课程名称')||lines.find(s=>!s.startsWith('【')&&!/^(教师|老师|教室|地点|周次|课程编号|学分|考查|考试)[:：]/.test(s)&&!/\d.*周|第?\d+.*节/.test(s));
+    const labeled=(kind)=>{const re=new RegExp('^(?:【)?(?:'+kind+')(?:】|[:：]|[ \u3000])');const l=lines.find(s=>re.test(s));return l?l.replace(re,'').trim():'';};
+    const name=labeled('课程|课程名称')||lines.find(s=>!s.startsWith('【')&&!/^(教师|老师|教室|地点|周次|课程编号|学分|考查|考试)[:： 　]/.test(s)&&!/\d.*周|第?\d+.*节/.test(s));
     if(!name)throw new Error('无法识别课程名');
-    const unlabeled=lines.filter(s=>s!==name&&s!==weekLine&&!s.startsWith('【')&&!/^(教师|老师|教室|地点|周次|课程编号|学分)[:：]/.test(s)&&!/^第?\d.*节/.test(s));
-    let teacher=labeled('教师|老师'),room=labeled('教室|地点|上课地点');
-    if(!teacher&&unlabeled.length>=2)teacher=unlabeled[0];
-    if(!room&&unlabeled.length)room=unlabeled[unlabeled.length-1];
+    const unlabeled=lines.filter(s=>s!==name&&s!==weekLine&&!s.startsWith('【')&&!/^(教师|老师|教室|地点|周次|课程编号|学分)[:： 　]/.test(s)&&!/^第?\d.*节/.test(s));
+    let teacher=labeled('教师|老师'),room=labeled('教室|地点|上课地点');const rest=unlabeled.slice();
+    if(!teacher&&rest.length)teacher=rest.shift();
+    if(!room&&rest.length)room=rest.pop();
     return periods.map(([start,end])=>validateCourse({name,teacher,room,day,start,end,weeks:parsedWeeks,color:['lavender','mint','sky','rose','peach','lemon'][index%6]}));
+  }
+  // A cell can stack several courses: 强智 separates them with a horizontal rule, 正方 with a
+  // blank line. A single course may contain blank lines too, so blank-line groups only count
+  // when every group carries week information.
+  function courseBlocks(cell){
+    const LF=String.fromCharCode(10),text=String(cell&&cell.text||'');
+    let blocks=Array.isArray(cell.blocks)&&cell.blocks.length>1?cell.blocks:null;
+    if(!blocks){
+      blocks=[];let current=[];
+      for(const line of text.split(LF)){
+        if(/^[ \t]*[-—]{3,}[ \t]*$/.test(line)){if(current.length){blocks.push(current.join(LF));current=[];}continue;}
+        current.push(line);
+      }
+      if(current.length)blocks.push(current.join(LF));
+      if(!blocks.length)blocks=[text];
+    }
+    if(blocks.length>1)return blocks;
+    const groups=[];let group=[];
+    for(const line of text.split(LF)){if(!line.trim()){if(group.length){groups.push(group.join(LF));group=[];}continue;}group.push(line);}
+    if(group.length)groups.push(group.join(LF));
+    return groups.length>1&&groups.every(s=>/[0-9]/.test(s)&&/周/.test(s))?groups:[text];
   }
   function parseSchoolSnapshot(snapshot){
     if(!snapshot||!Array.isArray(snapshot.tables))throw new Error('未找到课表表格，请进入个人课表页面再识别');
@@ -135,7 +168,7 @@
       const firstDayCol=Math.min(...Object.keys(dayCols).map(Number));
       const rowPeriods=grid.map(cells=>{for(let col=firstDayCol-1;col>=0;col--){try{const ranges=parsePeriodRanges(cells[col]?.text);if(ranges)return ranges;}catch(_){return null;}}return null;});
       for(let r=header+1;r<rows.length;r++){
-        for(const {cell,col,rowSpan,colSpan} of orig[r]||[]){const day=dayCols[col];if(!day)continue;const blocks=Array.isArray(cell.blocks)&&cell.blocks.length?cell.blocks:String(cell.text||'').split(/\n\s*[-—]{3,}\s*\n/);
+        for(const {cell,col,rowSpan,colSpan} of orig[r]||[]){const day=dayCols[col];if(!day)continue;const blocks=courseBlocks(cell);
           const spannedRows=rowPeriods.slice(r,r+rowSpan);let fallback=null;
           if(spannedRows.length===rowSpan&&spannedRows.every(Boolean))fallback=periodRanges(spannedRows.flatMap(ranges=>ranges.flatMap(([a,b])=>Array.from({length:b-a+1},(_,i)=>a+i))));
           for(const block of blocks){try{if(colSpan>1&&Array.from({length:colSpan},(_,i)=>dayCols[col+i]).some(d=>d&&d!==day))throw new Error('单元格跨越多个星期，请手动确认上课日');const parsed=parseBlock(block,day,fallback,courses.length);if(parsed)courses.push(...parsed);}catch(e){if(String(block).trim())warnings.push('星期'+day+'：'+e.message);}}
@@ -148,6 +181,18 @@
     return {courses,warnings:[...new Set(warnings)],source:snapshot.sourceHost||''};
   }
   function conflicts(courses){const result=[];for(let i=0;i<courses.length;i++)for(let j=i+1;j<courses.length;j++){const a=courses[i],b=courses[j];if(a.day===b.day&&a.start<=b.end&&b.start<=a.end&&a.weeks.some(w=>b.weeks.includes(w)))result.push(a.name+' / '+b.name+'（周'+a.day+'）');}return result;}
-  function snapshotScript(){return `(function(){var out={sourceHost:location.hostname,tables:[]};function scan(doc){Array.from(doc.querySelectorAll('table')).forEach(function(table){if(table.rows.length>80)return;out.tables.push({rows:Array.from(table.rows).map(function(row){return {cells:Array.from(row.cells).map(function(cell){var clone=cell.cloneNode(true);clone.querySelectorAll('input,textarea,select,button,script,style,form').forEach(function(n){n.remove()});clone.querySelectorAll('br').forEach(function(n){n.replaceWith(doc.createTextNode('\\n'))});clone.querySelectorAll('hr').forEach(function(n){n.replaceWith(doc.createTextNode('\\n---\\n'))});clone.querySelectorAll('[title]').forEach(function(n){var t=n.getAttribute('title')||'';if(/教师|老师/.test(t))n.prepend(doc.createTextNode('\\n【教师】'));else if(/教室|地点/.test(t))n.prepend(doc.createTextNode('\\n【地点】'));else if(/周次|周数/.test(t))n.prepend(doc.createTextNode('\\n【周次】'));});var text=(clone.textContent||'').trim();return {text:text,rowSpan:cell.rowSpan,colSpan:cell.colSpan,blocks:text.split(/\\n\\s*[-—]{3,}\\s*\\n/)};})};})});});Array.from(doc.querySelectorAll('iframe,frame')).forEach(function(f){try{if(f.contentDocument)scan(f.contentDocument);}catch(e){}});}scan(document);return JSON.stringify(out);})()`;}
-  return {uid,parseWeeks,weekLabel,validateCourse,normalizeCourses,monday,dateString,parseDate,weekAt,defaultState,sanitizeState,validTimeRange,parseCSV,parsePeriods,parsePeriodRanges,parseSchoolSnapshot,conflicts,snapshotScript};
+  // Reads one table cell into text with one field per line. The injected page extractor
+  // serialises this function, so it must stay dependency-free and backslash-free.
+  function cellSnapshot(doc,cell){
+    const LF=String.fromCharCode(10);
+    const clone=cell.cloneNode(true);
+    clone.querySelectorAll('input,textarea,select,button,script,style,form').forEach(n=>n.remove());
+    clone.querySelectorAll('br').forEach(n=>n.replaceWith(doc.createTextNode(LF)));
+    clone.querySelectorAll('hr').forEach(n=>n.replaceWith(doc.createTextNode(LF+'---'+LF)));
+    clone.querySelectorAll('div,p,li,dt,dd,section,article,header,footer').forEach(n=>{if((n.textContent||'').slice(-1)!==LF)n.appendChild(doc.createTextNode(LF));});
+    clone.querySelectorAll('[title]').forEach(n=>{const t=n.getAttribute('title')||'';const tag=/教师|老师/.test(t)?'【教师】':/教室|地点/.test(t)?'【地点】':/周次|周数/.test(t)?'【周次】':'';if(!tag)return;const prev=n.previousSibling;if(!prev||!(prev.textContent||'').endsWith(LF))n.prepend(doc.createTextNode(LF));n.prepend(doc.createTextNode(tag));});
+    return {text:(clone.textContent||'').trim(),rowSpan:cell.rowSpan,colSpan:cell.colSpan};
+  }
+  function snapshotScript(){return `(function(){var out={sourceHost:location.hostname,tables:[]};var capture=${cellSnapshot.toString()};function scan(doc){Array.from(doc.querySelectorAll("table")).forEach(function(table){if(table.rows.length>80)return;out.tables.push({rows:Array.from(table.rows).map(function(row){return {cells:Array.from(row.cells).map(function(cell){return capture(doc,cell);})};})});});Array.from(doc.querySelectorAll("iframe,frame")).forEach(function(f){try{if(f.contentDocument)scan(f.contentDocument);}catch(e){}});}scan(document);return JSON.stringify(out);})()`;}
+  return {uid,parseWeeks,weekLabel,validateCourse,normalizeCourses,monday,dateString,parseDate,weekAt,defaultState,sanitizeState,validTimeRange,parseCSV,parsePeriods,parsePeriodRanges,parseSchoolSnapshot,conflicts,snapshotScript,cellSnapshot,SCHOOL_PRESETS,schoolPreset};
 });
