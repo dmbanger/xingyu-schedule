@@ -134,8 +134,8 @@ test('旧版内置默认值只迁移一次；之后手填“北京邮电大学�
   assert.equal(legacy.settings.schoolName,'北京邮电大学');
   assert.equal(legacy.settings.schoolPreset,'bupt');
   assert.equal(legacy.settings.schoolUrl,'https://jwgl.bupt.edu.cn/');
-  assert.equal(legacy.version,2);
-  // 迁移之后保存的 state 带 version 2：用户手填的学校名与网址必须原样保留
+  assert.equal(legacy.version,3);
+  // 迁移之后保存的 state 带当前版本号：用户手填的学校名与网址必须原样保留
   const edited=C.sanitizeState({version:2,courses:[],settings:{schoolName:'北京邮电大学',schoolUrl:'https://auth.bupt.edu.cn/'}});
   assert.equal(edited.settings.schoolName,'北京邮电大学');
   assert.equal(edited.settings.schoolUrl,'https://auth.bupt.edu.cn/');
@@ -146,6 +146,58 @@ test('旧版内置默认值只迁移一次；之后手填“北京邮电大学�
   assert.equal(kept.settings.schoolUrl,'https://jw.example.edu.cn/');
   assert.equal(C.defaultState().settings.schoolName,'我的学校');
   assert.equal(C.defaultState().settings.schoolUrl,'');
+});
+test('旧版单课表升级为一张课表，课程、学期与作息一起迁移',()=>{
+  const migrated=C.sanitizeState({version:2,courses:[{name:'高等数学',day:1,start:1,end:2,weeks:'1-16'}],settings:{semesterStart:'2026-09-07',semesterConfigured:true,totalWeeks:18,periods:15,times:['08:00-08:45','08:50-09:35'],theme:'night',background:'none',cardOpacity:70,schoolName:'某某大学'}});
+  assert.equal(migrated.version,3);
+  assert.equal(migrated.timetables.length,1);
+  const t=migrated.timetables[0];
+  assert.equal(t.courses.length,1);
+  assert.equal(t.semesterStart,'2026-09-07');
+  assert.equal(t.semesterConfigured,true);
+  assert.equal(t.totalWeeks,18);
+  assert.equal(t.periods,15);
+  assert.equal(t.times.length,2);
+  assert.equal(t.name,'2026 秋季学期');
+  // 主题/背景/学校属于全局设置
+  assert.equal(migrated.settings.theme,'night');
+  assert.equal(migrated.settings.background,'none');
+  assert.equal(migrated.settings.cardOpacity,70);
+  assert.equal(migrated.settings.schoolName,'某某大学');
+  assert.equal(migrated.activeId,t.id);
+});
+test('多张课表：各自保留课程与学期，activeId 决定当前课表',()=>{
+  const raw={version:3,activeId:'tb',timetables:[
+    {id:'ta',name:'2026 秋季学期',semesterStart:'2026-09-07',semesterConfigured:true,totalWeeks:18,periods:12,times:['08:00-08:45'],courses:[{name:'高等数学',day:1,start:1,end:2,weeks:'1-16'}]},
+    {id:'tb',name:'2027 春季学期',semesterStart:'2027-02-22',semesterConfigured:true,totalWeeks:20,periods:12,times:['08:00-08:45'],courses:[{name:'大学英语',day:2,start:3,end:4,weeks:'1-16'}]}
+  ],settings:{schoolName:'某某大学',theme:'sakura'}};
+  const state=C.sanitizeState(raw);
+  assert.equal(state.timetables.length,2);
+  assert.equal(state.activeId,'tb');
+  assert.deepEqual(state.timetables.map(t=>t.name),['2026 秋季学期','2027 春季学期']);
+  assert.deepEqual(state.timetables.map(t=>t.courses.map(c=>c.name)),[['高等数学'],['大学英语']]);
+  assert.deepEqual(state.timetables.map(t=>t.semesterStart),['2026-09-07','2027-02-22']);
+  assert.equal(state.settings.theme,'sakura');
+  assert.equal(state.settings.schoolName,'某某大学');
+  // 课程不会在课表之间串味
+  assert.notEqual(state.timetables[0].courses[0].id,state.timetables[1].courses[0].id);
+});
+test('多张课表的边界：非法 activeId、重复 id、空列表与数量上限',()=>{
+  const fallback=C.sanitizeState({version:3,activeId:'missing',timetables:[{id:'ta',name:'A'},{id:'tb',name:'B'}]});
+  assert.equal(fallback.activeId,'ta');
+  const dupes=C.sanitizeState({version:3,timetables:[{id:'same',name:'A'},{id:'same',name:'B'}]});
+  assert.equal(dupes.timetables.length,2);
+  assert.notEqual(dupes.timetables[0].id,dupes.timetables[1].id);
+  const empty=C.sanitizeState({version:3,timetables:[]});
+  assert.equal(empty.timetables.length,1);
+  const many=C.sanitizeState({version:3,timetables:Array.from({length:30},(_,i)=>({name:'课表 '+(i+1)}))});
+  assert.equal(many.timetables.length,12);
+});
+test('学期名称按开学日期推断季节',()=>{
+  assert.equal(C.semesterName('2026-09-07'),'2026 秋季学期');
+  assert.equal(C.semesterName('2027-01-11'),'2026 秋季学期');
+  assert.equal(C.semesterName('2027-02-22'),'2027 春季学期');
+  assert.equal(C.semesterName('2027-07-05'),'2027 春季学期');
 });
 test('教学周和日期校验：周日仍属于同一周，周一进入下一周',()=>{
   assert.equal(C.weekAt('2026-09-07',new Date(2026,8,13)),1);

@@ -52,24 +52,63 @@
   function dateString(d){return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');}
   function parseDate(s){if(!/^\d{4}-\d{2}-\d{2}$/.test(s||''))throw new Error('日期格式无效');const [y,m,d]=s.split('-').map(Number),v=new Date(y,m-1,d);if(dateString(v)!==s)throw new Error('日期无效');return v;}
   function weekAt(start,now=new Date()){const a=monday(parseDate(start)),b=monday(now);return Math.round((Date.UTC(b.getFullYear(),b.getMonth(),b.getDate())-Date.UTC(a.getFullYear(),a.getMonth(),a.getDate()))/604800000)+1;}
-  function defaultState(){return {version:2,courses:[],settings:{schoolName:'我的学校',schoolUrl:'',schoolPreset:'generic',semesterStart:dateString(monday()),semesterConfigured:false,totalWeeks:20,periods:12,theme:'starlight',background:'builtin',cardOpacity:88,times:['08:00-08:45','08:50-09:35','09:50-10:35','10:40-11:25','11:30-12:15','13:30-14:15','14:20-15:05','15:20-16:05','16:10-16:55','18:30-19:15','19:20-20:05','20:10-20:55']}};}
+  const STATE_VERSION=3;
+  const DEFAULT_TIMES=['08:00-08:45','08:50-09:35','09:50-10:35','10:40-11:25','11:30-12:15','13:30-14:15','14:20-15:05','15:20-16:05','16:10-16:55','18:30-19:15','19:20-20:05','20:10-20:55'];
+  function defaultSettings(){return {schoolName:'我的学校',schoolUrl:'',schoolPreset:'generic',theme:'starlight',background:'builtin',cardOpacity:88};}
+  function tid(){return 't'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
+  // "2026 秋季学期" style names, derived from the first Monday of the semester.
+  function semesterName(dateValue){
+    let d;try{d=parseDate(dateValue);}catch(_){d=new Date();}
+    const y=d.getFullYear(),m=d.getMonth()+1;
+    if(m>=8)return y+' 秋季学期';
+    if(m<=1)return (y-1)+' 秋季学期';
+    return y+' 春季学期';
+  }
+  function defaultTimetable(){
+    const start=dateString(monday());
+    return {id:tid(),name:semesterName(start),semesterStart:start,semesterConfigured:false,totalWeeks:20,periods:12,times:DEFAULT_TIMES.slice(),courses:[]};
+  }
+  function defaultState(){const t=defaultTimetable();return {version:STATE_VERSION,activeId:t.id,timetables:[t],settings:defaultSettings()};}
+  function sanitizeTimetable(raw,index){
+    const base=defaultTimetable();
+    if(!raw||typeof raw!=='object'){base.name='课表 '+(index+1);return base;}
+    const t={...base};
+    if(typeof raw.id==='string'&&/^[A-Za-z0-9_-]{1,40}$/.test(raw.id))t.id=raw.id;
+    try{parseDate(raw.semesterStart);t.semesterStart=raw.semesterStart;}catch(_){}
+    t.semesterConfigured=raw.semesterConfigured===true;
+    t.name=(typeof raw.name==='string'?raw.name.trim():'').slice(0,40)||semesterName(t.semesterStart);
+    for(const [key,min,max] of [['totalWeeks',1,40],['periods',1,24]])if(Number.isInteger(Number(raw[key]))&&Number(raw[key])>=min&&Number(raw[key])<=max)t[key]=Number(raw[key]);
+    if(Array.isArray(raw.times)&&raw.times.length<=24&&raw.times.every(validTimeRange))t.times=raw.times.slice();
+    t.courses=normalizeCourses(raw.courses||[]);
+    return t;
+  }
+  function applyGlobalSettings(target,s){
+    for(const key of ['schoolName','schoolUrl'])if(typeof s[key]==='string')target[key]=s[key].slice(0,500);
+    if(['starlight','sakura','night'].includes(s.theme))target.theme=s.theme;
+    if(['builtin','custom','none'].includes(s.background))target.background=s.background;
+    if(Number.isInteger(Number(s.cardOpacity))&&Number(s.cardOpacity)>=35&&Number(s.cardOpacity)<=100)target.cardOpacity=Number(s.cardOpacity);
+    if(SCHOOL_PRESETS.some(p=>p.id===s.schoolPreset))target.schoolPreset=s.schoolPreset;
+  }
+  // Pre-0.2.0 installs carried one school name and URL as the built-in default.
+  function migrateLegacySchool(settings,raw){
+    if(Number(raw&&raw.version||1)>=2)return;
+    if(settings.schoolName==='北京邮电大学')settings.schoolPreset='bupt';
+    if(/^https?:\/\/auth\.bupt\.edu\.cn\/?$/.test(settings.schoolUrl))settings.schoolUrl='https://jwgl.bupt.edu.cn/';
+  }
   function sanitizeState(raw){
-    const d=defaultState();if(!raw||typeof raw!=='object')return d;d.courses=normalizeCourses(raw.courses||[]);const s=raw.settings||{};
-    for(const key of ['schoolName','schoolUrl'])if(typeof s[key]==='string')d.settings[key]=s[key].slice(0,500);
-    // Pre-0.2.0 builds baked one school in. Migrate that saved default exactly once: after the
-    // first save the state carries version 2, so anything the user types later is left alone.
-    if(Number(raw.version||1)<2){
-      if(d.settings.schoolName==='北京邮电大学')d.settings.schoolPreset='bupt';
-      if(/^https?:\/\/auth\.bupt\.edu\.cn\/?$/.test(d.settings.schoolUrl))d.settings.schoolUrl='https://jwgl.bupt.edu.cn/';
+    if(!raw||typeof raw!=='object')return defaultState();
+    const list=(Array.isArray(raw.timetables)?raw.timetables:[]).slice(0,12).map((t,i)=>sanitizeTimetable(t,i));
+    if(!list.length){
+      // 0.2.x and older kept a single timetable next to the app settings.
+      const legacy=raw.settings||{};
+      list.push(sanitizeTimetable({id:'tlegacy',name:semesterName(legacy.semesterStart),semesterStart:legacy.semesterStart,semesterConfigured:legacy.semesterConfigured,totalWeeks:legacy.totalWeeks,periods:legacy.periods,times:legacy.times,courses:raw.courses||[]},0));
     }
-    try{parseDate(s.semesterStart);d.settings.semesterStart=s.semesterStart;}catch(_){}
-    d.settings.semesterConfigured=s.semesterConfigured===true;
-    for(const [key,min,max] of [['totalWeeks',1,40],['periods',1,24],['cardOpacity',35,100]])if(Number.isInteger(Number(s[key]))&&Number(s[key])>=min&&Number(s[key])<=max)d.settings[key]=Number(s[key]);
-    if(['starlight','sakura','night'].includes(s.theme))d.settings.theme=s.theme;
-    if(SCHOOL_PRESETS.some(p=>p.id===s.schoolPreset))d.settings.schoolPreset=s.schoolPreset;
-    if(['builtin','custom','none'].includes(s.background))d.settings.background=s.background;
-    if(Array.isArray(s.times)&&s.times.length<=24&&s.times.every(t=>validTimeRange(t)))d.settings.times=s.times;
-    return d;
+    const seen=new Set();
+    for(const t of list){if(seen.has(t.id))t.id=tid();seen.add(t.id);}
+    const state={version:STATE_VERSION,activeId:list.some(t=>t.id===raw.activeId)?raw.activeId:list[0].id,timetables:list,settings:defaultSettings()};
+    applyGlobalSettings(state.settings,raw.settings||{});
+    migrateLegacySchool(state.settings,raw);
+    return state;
   }
   function validTimeRange(t){if(typeof t!=='string'||!/^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$/.test(t))return false;return t.slice(0,5)<t.slice(6);}
   function parseCSV(text){
@@ -196,5 +235,5 @@
     return {text:(clone.textContent||'').trim(),rowSpan:cell.rowSpan,colSpan:cell.colSpan};
   }
   function snapshotScript(){return `(function(){var out={sourceHost:location.hostname,tables:[]};var capture=${cellSnapshot.toString()};function scan(doc){Array.from(doc.querySelectorAll("table")).forEach(function(table){if(table.rows.length>80)return;out.tables.push({rows:Array.from(table.rows).map(function(row){return {cells:Array.from(row.cells).map(function(cell){return capture(doc,cell);})};})});});Array.from(doc.querySelectorAll("iframe,frame")).forEach(function(f){try{if(f.contentDocument)scan(f.contentDocument);}catch(e){}});}scan(document);return JSON.stringify(out);})()`;}
-  return {uid,parseWeeks,weekLabel,validateCourse,normalizeCourses,monday,dateString,parseDate,weekAt,defaultState,sanitizeState,validTimeRange,parseCSV,parsePeriods,parsePeriodRanges,parseSchoolSnapshot,conflicts,snapshotScript,cellSnapshot,SCHOOL_PRESETS,schoolPreset};
+  return {uid,parseWeeks,weekLabel,validateCourse,normalizeCourses,monday,dateString,parseDate,weekAt,defaultState,sanitizeState,validTimeRange,parseCSV,parsePeriods,parsePeriodRanges,parseSchoolSnapshot,conflicts,snapshotScript,cellSnapshot,SCHOOL_PRESETS,schoolPreset,semesterName,sanitizeTimetable,defaultTimetable};
 });

@@ -32,3 +32,20 @@ body[data-theme=night] .today-fab{color:#292039}
 @keyframes today-highlight{0%,40%{background:var(--accent-soft);box-shadow:inset 0 0 0 2px var(--accent);border-radius:9px}100%{background:transparent;box-shadow:inset 0 0 0 0 transparent}}
 @media(min-width:700px){.today-fab{right:40px;bottom:102px}}
 @media(prefers-reduced-motion:reduce){.day.today-focus{animation:none}}
+
+/* 多张课表：标题下的切换入口与切换面板 */
+.timetable-row{display:flex;align-items:center;gap:8px;margin:-2px 0 10px}
+.timetable-chip{display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:5px 10px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);font-size:12px;font-weight:650;line-height:1.2}
+.timetable-chip .chip-icon{display:inline-grid;place-items:center;color:var(--accent)}
+.timetable-chip .chip-icon svg{width:13px;height:13px}
+.timetable-chip .chip-caret{margin-left:2px;color:var(--muted)}
+.chip-count{font-size:10px;color:var(--muted)}
+.timetable-list{display:flex;flex-direction:column;gap:8px;margin:10px 0 14px}
+.timetable-item{display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.55)}
+.timetable-item.active{border-color:var(--accent);background:var(--accent-soft)}
+.timetable-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;border:0;background:none;padding:0;text-align:left;color:var(--ink)}
+.timetable-main strong{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.timetable-main small{font-size:10px;color:var(--muted);line-height:1.4}
+.timetable-tools{display:flex;gap:6px;flex:none}
+.timetable-tools .text-button{font-size:10px;white-space:nowrap}
+body[data-theme=night] .timetable-item{background:rgba(43,40,67,.55)}
