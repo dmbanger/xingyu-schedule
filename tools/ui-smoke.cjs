@@ -1,0 +1,66 @@
+const {chromium}=require('playwright'),assert=require('node:assert/strict'),path=require('node:path'),fs=require('node:fs');
+const {pathToFileURL}=require('node:url');
+(async()=>{
+  const output=path.join(__dirname,'../build/qa');fs.mkdirSync(output,{recursive:true});
+  const browser=await chromium.launch({channel:'msedge',headless:true});
+  const context=await browser.newContext({viewport:{width:393,height:852},deviceScaleFactor:2,locale:'zh-CN',timezoneId:'Asia/Shanghai'});
+  const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto(pathToFileURL(path.join(__dirname,'../app/src/main/assets/index.html')).href);
+  await page.getByRole('heading',{name:'新学期，从这里开始'}).waitFor();
+  await page.screenshot({path:path.join(output,'01-empty.png')});
+  await page.getByRole('button',{name:'先看看装扮效果 →'}).click();
+  assert.equal(await page.locator('.course-card').count(),8);
+  await page.screenshot({path:path.join(output,'02-demo.png')});
+  await page.getByRole('button',{name:'退出示例',exact:true}).click();
+  await page.locator('[data-action="add"]').first().click();
+  await page.locator('#course-form [name="name"]').fill('本地保存验证');
+  await page.locator('#course-form [name="room"]').fill('教三 201');
+  await page.locator('#course-form [name="weeks"]').fill('1-16单周');
+  await page.getByRole('button',{name:'保存课程',exact:true}).click();
+  assert.equal(await page.locator('.course-card').count(),1);
+  await page.reload();
+  assert.equal(await page.locator('.course-card').count(),1);
+  await page.locator('[data-tab="theme"]').click();
+  await page.locator('[data-theme="sakura"]').click();
+  assert.equal(await page.locator('body').getAttribute('data-theme'),'sakura');
+  await page.screenshot({path:path.join(output,'03-themes.png')});
+  await page.locator('[data-theme="night"]').click();
+  await page.screenshot({path:path.join(output,'04-night.png')});
+  await page.locator('[data-tab="import"]').click();
+  await page.screenshot({path:path.join(output,'05-import.png')});
+  await page.evaluate(()=>window.receiveImportFile('课程名称,星期,开始节次,结束节次,周次,教室,教师\nCSV导入验证,2,3,4,"1-8,10-16",教二305,示例教师'));
+  await page.getByRole('heading',{name:'核对导入结果'}).waitFor();
+  assert.equal(await page.locator('.preview-course').count(),1);
+  await page.locator('[data-action="confirm-import"]').click();
+  const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('xingyu-state')));
+  assert.equal(saved.courses.length,1);assert.equal(saved.courses[0].name,'CSV导入验证');
+  await page.locator('[data-tab="settings"]').click();
+  await page.locator('[data-action="undo-import"]').click();
+  await page.locator('#confirm-button').click();
+  const restored=await page.evaluate(()=>JSON.parse(localStorage.getItem('xingyu-state')));
+  assert.equal(restored.courses[0].name,'本地保存验证');
+  await page.evaluate(text=>window.receiveImportFile(text),fs.readFileSync(path.join(__dirname,'../examples/qiangzhi-demo.html'),'utf8'));
+  assert.equal(await page.locator('.preview-course').count(),3);
+  await page.locator('[data-action="close"]').click();
+  // Input values, scripts, and hidden login forms must not be captured by the school extractor.
+  const school=await context.newPage();await school.setContent('<form><input value="private-password"></form><table><tr><td>星期一</td></tr><tr><td>课程甲<br><span title="教师">王老师</span><br>1-16周[01-02节]<br><span title="教室">教三201</span></td></tr></table>');
+  const script=require('../app/src/main/assets/core.js').snapshotScript();
+  const captured=await school.evaluate(script);assert.ok(!captured.includes('private-password'));assert.ok(captured.includes('【教师】'));assert.ok(captured.includes('教三201'));
+  // File-derived text is displayed as text, including characters that resemble HTML.
+  await page.locator('[data-tab="import"]').click();
+  await page.evaluate(()=>window.receiveImportFile(JSON.stringify({courses:[{name:'<img src=x onerror=alert(1)>',day:1,start:1,end:2,weeks:'1-16'}]})));
+  assert.equal(await page.locator('.preview-course img').count(),0);assert.ok((await page.locator('.preview-course').innerText()).includes('<img'));
+  await page.locator('[data-action="close"]').click();
+  // All main screens must fit the phone width.
+  for(const tab of ['schedule','import','theme','settings']){await page.locator('[data-tab="'+tab+'"]').click();assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Horizontal overflow: '+tab);}
+  await page.setViewportSize({width:360,height:740});
+  await page.locator('[data-tab="schedule"]').click();await page.locator('[data-action="week-picker"]').click();await page.screenshot({path:path.join(output,'06-small-phone.png')});
+  const mobile=await browser.newContext({viewport:{width:393,height:852},isMobile:true,deviceScaleFactor:2});
+  const desktopTest=await mobile.newPage();await desktopTest.setContent('<meta name="viewport" content="width=device-width,initial-scale=1"><h1>教务页面</h1><table><tr><td>课表</td></tr></table>');
+  assert.ok(await desktopTest.evaluate(()=>innerWidth<500));
+  await desktopTest.evaluate(fs.readFileSync(path.join(__dirname,'../app/src/main/assets/desktop-viewport.js'),'utf8'));
+  await desktopTest.waitForFunction(()=>innerWidth>=1280);assert.equal(await desktopTest.locator('meta[name="viewport"]').getAttribute('content'),'width=1280');
+  assert.deepEqual(errors,[]);
+  fs.writeFileSync(path.join(output,'ui-smoke-result.json'),JSON.stringify({passed:true,checks:['empty state','demo isolation','course creation','reload persistence','themes','CSV preview and replace','import rollback','school extractor excludes form values','untrusted text rendering','phone widths'],pageErrors:errors},null,2));
+  console.log('UI smoke: 10 flows passed; screenshots: '+output);await browser.close();
+})().catch(e=>{console.error(e);process.exit(1);});

@@ -1,0 +1,9 @@
+plugins { id 'com.android.application' }
+def appVersion = new Properties()
+rootProject.file('version.properties').withInputStream { appVersion.load(it) }
+android {
+    namespace 'app.xingyu.schedule'
+    compileSdk 35
+    defaultConfig { applicationId 'app.xingyu.schedule'; minSdk 26; targetSdk 35; versionCode appVersion.versionCode.toInteger(); versionName appVersion.versionName }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_1_8; targetCompatibility JavaVersion.VERSION_1_8 }
+}

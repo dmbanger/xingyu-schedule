@@ -1,0 +1,11 @@
+.gradle/
+local.properties
+build/
+app/build/
+*.jks
+*.keystore
+
+# Release binaries stay in dist/ for delivery but are not versioned.
+dist/*.apk
+dist/*.idsig
+dist/*-source.zip

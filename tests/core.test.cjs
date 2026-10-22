@@ -1,0 +1,105 @@
+const test=require('node:test'),assert=require('node:assert/strict');
+const C=require('../app/src/main/assets/core.js');
+const cell=(text='',extra={})=>({text,rowSpan:1,colSpan:1,...extra});
+const row=(...cells)=>({cells});
+const header=row(cell('节次'),...['一','二','三','四','五','六','日'].map(d=>cell('星期'+d)));
+const course=(extra={})=>({name:'离散数学',day:1,start:1,end:2,weeks:'1-16',...extra});
+
+test('周次：区间、不连续周次、全角、单双周',()=>{
+  assert.deepEqual(C.parseWeeks('1-3,5,7-8'),[1,2,3,5,7,8]);
+  assert.deepEqual(C.parseWeeks('第１～６周（单）'),[1,3,5]);
+  assert.deepEqual(C.parseWeeks('1-6(双周)'),[2,4,6]);
+  assert.deepEqual(C.parseWeeks('1-4(周)'),[1,2,3,4]);
+  assert.equal(C.weekLabel([1,2,3,5,7,8]),'1-3,5,7-8');
+});
+test('周次错误不得被替换成整学期',()=>{
+  for(const input of ['','0-16','16-1','1-41','下半学期','1-16单双周',[]])assert.throws(()=>C.parseWeeks(input));
+});
+test('识别节次时不把周次误认为节次',()=>{
+  assert.deepEqual(C.parsePeriods('1-16(周)[03-04节]'),[3,4]);
+  assert.deepEqual(C.parsePeriods('第1-2节'),[1,2]);
+  assert.deepEqual(C.parsePeriods('第一二节'),[1,2]);
+  assert.equal(C.parsePeriods('1-16周'),null);
+});
+test('三节与四节课必须读取完整列表，不能只取末尾两节',()=>{
+  for(const label of ['第1,2,3节','第1、2、3节','[01-02-03节]','[01,02,03]节','第０１，０２，０３节','第1-3节','[010203节]','第一二三节'])assert.deepEqual(C.parsePeriods(label),[1,3],label);
+  assert.deepEqual(C.parsePeriods('[01,02,03,04节]'),[1,4]);
+  assert.deepEqual(C.parsePeriods('第十一、十二、十三节'),[11,13]);
+  assert.deepEqual(C.parsePeriods('第1节至第3节'),[1,3]);
+});
+test('不连续节次要分段，不能补出不存在的中间课程',()=>{
+  assert.deepEqual(C.parsePeriodRanges('第1,3,5节'),[[1,1],[3,3],[5,5]]);
+  assert.throws(()=>C.parsePeriods('第1,3,5节'),/不连续/);
+  assert.throws(()=>C.parsePeriodRanges('第1,2,33节'),/1–24/);
+  const out=C.parseSchoolSnapshot({tables:[{rows:[header,row(cell('1-2'),cell('实验课\n1-16周[01,03,05节]'),...Array.from({length:6},()=>cell()))]}]});
+  assert.deepEqual(out.courses.map(c=>[c.start,c.end]),[[1,1],[3,3],[5,5]]);
+});
+test('三节课的完整导入：明确节次优先于两节一组的行标题',()=>{
+  const out=C.parseSchoolSnapshot({tables:[{rows:[header,row(cell('第1-2节'),cell('三节实验\n王老师\n1-16周[01,02,03节]\n实验楼101'),...Array.from({length:6},()=>cell()))]}]});
+  assert.deepEqual([out.courses[0].day,out.courses[0].start,out.courses[0].end],[1,1,3]);
+});
+test('无明确节次的跨三行课程根据各行节次恢复长度与星期',()=>{
+  const rows=[row(cell('时段'),cell('节次'),...['一','二','三','四','五','六','日'].map(d=>cell('星期'+d))),
+    row(cell('上午',{rowSpan:3}),cell('1'),cell('跨三行课程\n1-16周',{rowSpan:3}),cell('星期二课程甲\n1-16周'),...Array.from({length:5},()=>cell())),
+    row(cell('2'),cell('星期二课程乙\n1-16周'),...Array.from({length:5},()=>cell())),
+    row(cell('3'),cell('星期二课程丙\n1-16周'),...Array.from({length:5},()=>cell()))];
+  const out=C.parseSchoolSnapshot({tables:[{rows}]});
+  assert.deepEqual([out.courses[0].day,out.courses[0].start,out.courses[0].end],[1,1,3]);
+  assert.deepEqual(out.courses.slice(1).map(c=>[c.day,c.start,c.end]),[[2,1,1],[2,2,2],[2,3,3]]);
+});
+test('rowspan=0 占据剩余行，不能挤偏后续课程的星期列',()=>{
+  const out=C.parseSchoolSnapshot({tables:[{rows:[header,row(cell('1'),cell('跨行课\n1-16周',{rowSpan:0}),cell(),...Array.from({length:5},()=>cell())),row(cell('2'),cell('第二天课程\n1-16周'),...Array.from({length:5},()=>cell())),row(cell('3'),cell(),...Array.from({length:5},()=>cell()))]}]});
+  assert.deepEqual([out.courses[0].day,out.courses[0].start,out.courses[0].end],[1,1,3]);assert.equal(out.courses[1].day,2);
+});
+test('带日期的星期标题和跨多个星期的模糊格子',()=>{
+  const datedHeader=row(cell('节次'),...['一','二','三','四','五','六','日'].map(d=>cell('星期'+d+'\n2026-10-22')));
+  const out=C.parseSchoolSnapshot({tables:[{rows:[datedHeader,row(cell('1-3'),cell('可确认课程\n1-16周'),cell('跨两天的未确认内容\n1-16周',{colSpan:2}),...Array.from({length:4},()=>cell()))]}]});
+  assert.equal(out.courses.length,1);assert.equal(out.warnings.length,1);assert.match(out.warnings[0],/跨越多个星期/);
+});
+test('强智单元格：带标签的教师、教室、单周和精确节次',()=>{
+  const snapshot={tables:[{rows:[header,row(cell('1-2'),cell('高等数学\n【教师】王老师\n【周次】1-16(单周)[01-02节]\n【地点】教三-201'),...Array.from({length:6},()=>cell()))]}]};
+  const out=C.parseSchoolSnapshot(snapshot);assert.equal(out.courses.length,1);const c=out.courses[0];
+  assert.equal(c.teacher,'王老师');assert.equal(c.room,'教三-201');assert.deepEqual(c.weeks,[1,3,5,7,9,11,13,15]);assert.deepEqual([c.day,c.start,c.end],[1,1,2]);assert.deepEqual(out.warnings,[]);
+});
+test('强智一个格子中的多门课与分段周次',()=>{
+  const snapshot={tables:[{rows:[header,row(cell('第3-4节'),cell('大学英语\n张老师\n1-8周,10-16周[03-04节]\n教二305\n---\n大学英语\n张老师\n9(周)[03-04节]\n教二306'),...Array.from({length:6},()=>cell()))]}]};
+  const out=C.parseSchoolSnapshot(snapshot);assert.equal(out.courses.length,2);assert.equal(out.courses[0].weeks.includes(9),false);assert.equal(out.courses[0].weeks.includes(16),true);assert.deepEqual(out.courses[1].weeks,[9]);assert.equal(out.courses[0].teacher,'张老师');
+});
+test('rowspan 不应导致星期列错位',()=>{
+  const data={tables:[{rows:[header,row(cell('第1-2节'),cell('课程甲\n1-16周[01-04节]',{rowSpan:2}),cell('课程乙\n1-16周[01-02节]'),...Array.from({length:5},()=>cell())),row(cell('第3-4节'),cell('课程丙\n1-16周[03-04节]'),...Array.from({length:5},()=>cell()))]}]};
+  const out=C.parseSchoolSnapshot(data);assert.equal(out.courses.length,3);assert.equal(out.courses.find(c=>c.name==='课程丙').day,2);assert.equal(out.courses.find(c=>c.name==='课程甲').end,4);
+});
+test('colspan 题头与同课程重复表格',()=>{
+  const rows=[row(cell('学期课表',{colSpan:8})),header,row(cell('1-2'),cell('离散数学\n1-8周'),...Array.from({length:6},()=>cell()))];
+  const out=C.parseSchoolSnapshot({tables:[{rows},{rows}]});assert.equal(out.courses.length,1);
+});
+test('部分单元格缺少周次：保留可识别课程并明确报告',()=>{
+  const out=C.parseSchoolSnapshot({tables:[{rows:[header,row(cell('1-2'),cell('离散数学\n1-16周'),cell('未确认周次的课程\n某教室'),...Array.from({length:5},()=>cell()))]}]});
+  assert.equal(out.courses.length,1);assert.equal(out.warnings.length,1);assert.match(out.warnings[0],/无法识别周次/);
+});
+test('登录页面或空课表不会导出空集合覆盖已有课表',()=>{
+  assert.throws(()=>C.parseSchoolSnapshot({tables:[]}),/未识别到/);
+  assert.throws(()=>C.parseSchoolSnapshot({tables:[{rows:[header,row(...Array.from({length:8},()=>cell()))]}]}),/没有可导入/);
+});
+test('CSV 支持中文表头、带逗号周次、引号与换行',()=>{
+  const csv='课程名称,星期,开始节次,结束节次,周次,教室,教师,备注\r\n"算法,设计",2,3,4,"1-3,5",教三201,王老师,"带有""引号""\n的备注"';
+  const [c]=C.parseCSV(csv);assert.equal(c.name,'算法,设计');assert.deepEqual(c.weeks,[1,2,3,5]);assert.equal(c.note,'带有"引号"\n的备注');assert.equal(c.day,2);
+  assert.throws(()=>C.parseCSV('课程名称,星期\n测试,1'),/需包含/);
+  assert.throws(()=>C.parseCSV('"未闭合'),/引号未闭合/);
+});
+test('冲突检查同时考虑星期、节次和周次',()=>{
+  assert.equal(C.conflicts(C.normalizeCourses([course(),course({name:'另一门课',start:2,end:3})])).length,1);
+  assert.equal(C.conflicts(C.normalizeCourses([course({weeks:'1-16单周'}),course({name:'另一门课',weeks:'1-16双周'})])).length,0);
+  assert.equal(C.conflicts(C.normalizeCourses([course(),course({name:'另一门课',day:2})])).length,0);
+});
+test('备份验证：无效节次不得被接受，重复ID不能互相覆盖',()=>{
+  assert.throws(()=>C.sanitizeState({courses:[course({end:0})]}));
+  const result=C.normalizeCourses([course({id:'same'}),course({name:'另一门课',id:'same'})]);assert.notEqual(result[0].id,result[1].id);
+  assert.equal(C.normalizeCourses([course(),course()]).length,1);
+});
+test('教学周和日期校验：周日仍属于同一周，周一进入下一周',()=>{
+  assert.equal(C.weekAt('2026-09-07',new Date(2026,8,13)),1);
+  assert.equal(C.weekAt('2026-09-07',new Date(2026,8,14)),2);
+  assert.throws(()=>C.parseDate('2026-02-30'));
+  assert.equal(C.validTimeRange('08:00-08:45'),true);assert.equal(C.validTimeRange('08:45-08:00'),false);assert.equal(C.validTimeRange('25:00-26:00'),false);
+});

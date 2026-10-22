@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="theme-color" content="#f7f5fd"><title>星屿课表</title><link rel="stylesheet" href="style.css"></head>
+<body><div id="wallpaper"></div><div class="veil"></div><div id="app">
+<header class="app-header"><div class="brand"><span class="brand-icon">✦</span><strong>星屿课表</strong></div><button class="icon-button" data-action="add" aria-label="添加课程" title="添加课程">＋</button></header>
+<main id="content" tabindex="-1"></main>
+<nav id="navigation" aria-label="主导航"></nav><button id="today-button" class="today-fab" data-action="today" aria-label="回到今日" title="回到今日">今</button><div id="week-feedback" class="week-feedback" role="status" aria-live="polite"></div></div>
+<dialog id="sheet"><div class="sheet-head"><h2 id="sheet-title"></h2><button class="icon-button" data-action="close" aria-label="关闭">×</button></div><div id="sheet-body"></div></dialog>
+<div id="toast" role="status" aria-live="polite"></div>
+<input id="browser-import" type="file" accept=".json,.csv,.html,.htm" hidden><input id="browser-background" type="file" accept="image/*" hidden>
+<script src="core.js"></script><script src="app.js"></script></body></html>
