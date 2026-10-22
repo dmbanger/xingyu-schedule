@@ -4,9 +4,8 @@
   // School presets only prefill the login entry. Every school can still type its own URL.
   const SCHOOL_PRESETS=[
     {id:'generic',label:'通用：手动填写教务网址',badge:'多校适配 · 正方 / 强智',url:'',hint:'填写你学校的教务入口网址。识别读取页面里的课表表格，正方、强智等常见教务系统都可以尝试；结构特殊的页面可能需要继续适配。'},
-    {id:'buct',label:'北京化工大学 · 正方教务',badge:'正方教务 · 已预置北化入口',url:'http://jwglxt.buct.edu.cn',hint:'已预置北京化工大学教务管理系统入口，会跳转学校统一身份认证。登录后进入“教务管理系统 → 信息查询 → 学生课表”，显示整学期课表后点“识别课表”。'},
-    {id:'zhengfang',label:'其他学校 · 正方教务',badge:'正方教务',url:'',hint:'正方教务：登录后进入“信息查询 → 学生课表 / 我的课表”，选对学期、显示整学期课表后识别。'},
-    {id:'qiangzhi',label:'其他学校 · 强智教务',badge:'强智教务',url:'',hint:'强智教务：登录后进入“个人课表 / 学期理论课表”，选对学期、显示整学期课表后识别。'}
+    {id:'bupt',label:'北京邮电大学 · 强智教务',badge:'强智教务 · 已预置北邮入口',url:'https://jwgl.bupt.edu.cn/',hint:'已预置北京邮电大学教务入口。登录后进入“个人课表 / 学期理论课表”，选对学期、显示整学期课表后点“识别课表”。如需校园网，请先连接学校 VPN。'},
+    {id:'buct',label:'北京化工大学 · 正方教务',badge:'正方教务 · 已预置北化入口',url:'http://jwglxt.buct.edu.cn',hint:'已预置北京化工大学教务管理系统入口，会跳转学校统一身份认证。登录后进入“教务管理系统 → 信息查询 → 学生课表”，显示整学期课表后点“识别课表”。'}
   ];
   function schoolPreset(id){return SCHOOL_PRESETS.find(p=>p.id===id)||SCHOOL_PRESETS[0];}
   function uid(){return 'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);}
@@ -53,13 +52,16 @@
   function dateString(d){return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');}
   function parseDate(s){if(!/^\d{4}-\d{2}-\d{2}$/.test(s||''))throw new Error('日期格式无效');const [y,m,d]=s.split('-').map(Number),v=new Date(y,m-1,d);if(dateString(v)!==s)throw new Error('日期无效');return v;}
   function weekAt(start,now=new Date()){const a=monday(parseDate(start)),b=monday(now);return Math.round((Date.UTC(b.getFullYear(),b.getMonth(),b.getDate())-Date.UTC(a.getFullYear(),a.getMonth(),a.getDate()))/604800000)+1;}
-  function defaultState(){return {version:1,courses:[],settings:{schoolName:'我的学校',schoolUrl:'',schoolPreset:'generic',semesterStart:dateString(monday()),semesterConfigured:false,totalWeeks:20,periods:12,theme:'starlight',background:'builtin',cardOpacity:88,times:['08:00-08:45','08:50-09:35','09:50-10:35','10:40-11:25','11:30-12:15','13:30-14:15','14:20-15:05','15:20-16:05','16:10-16:55','18:30-19:15','19:20-20:05','20:10-20:55']}};}
+  function defaultState(){return {version:2,courses:[],settings:{schoolName:'我的学校',schoolUrl:'',schoolPreset:'generic',semesterStart:dateString(monday()),semesterConfigured:false,totalWeeks:20,periods:12,theme:'starlight',background:'builtin',cardOpacity:88,times:['08:00-08:45','08:50-09:35','09:50-10:35','10:40-11:25','11:30-12:15','13:30-14:15','14:20-15:05','15:20-16:05','16:10-16:55','18:30-19:15','19:20-20:05','20:10-20:55']}};}
   function sanitizeState(raw){
     const d=defaultState();if(!raw||typeof raw!=='object')return d;d.courses=normalizeCourses(raw.courses||[]);const s=raw.settings||{};
     for(const key of ['schoolName','schoolUrl'])if(typeof s[key]==='string')d.settings[key]=s[key].slice(0,500);
-    // 0.1.x shipped with one example school baked in; old installs are migrated to the neutral default.
-    if(d.settings.schoolName==='北京邮电大学')d.settings.schoolName='我的学校';
-    if(/^https?:\/\/auth\.bupt\.edu\.cn\/?$/.test(d.settings.schoolUrl))d.settings.schoolUrl='';
+    // Pre-0.2.0 builds baked one school in. Migrate that saved default exactly once: after the
+    // first save the state carries version 2, so anything the user types later is left alone.
+    if(Number(raw.version||1)<2){
+      if(d.settings.schoolName==='北京邮电大学')d.settings.schoolPreset='bupt';
+      if(/^https?:\/\/auth\.bupt\.edu\.cn\/?$/.test(d.settings.schoolUrl))d.settings.schoolUrl='https://jwgl.bupt.edu.cn/';
+    }
     try{parseDate(s.semesterStart);d.settings.semesterStart=s.semesterStart;}catch(_){}
     d.settings.semesterConfigured=s.semesterConfigured===true;
     for(const [key,min,max] of [['totalWeeks',1,40],['periods',1,24],['cardOpacity',35,100]])if(Number.isInteger(Number(s[key]))&&Number(s[key])>=min&&Number(s[key])<=max)d.settings[key]=Number(s[key]);

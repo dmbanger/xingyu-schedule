@@ -117,18 +117,30 @@ test('正方课表：一个格子用空行分隔两门课、单周写法与空�
   assert.deepEqual([data.teacher,data.room],[ '王五','实验楼301']);
   assert.deepEqual(data.weeks,[1,3,5,7,9,11,13,15]);
 });
-test('学校预设：包含北化正方入口，未知预设回落到通用',()=>{
-  const buct=C.schoolPreset('buct');
+test('学校预设：北邮强智与北化正方入口，其余选项已移除',()=>{
+  assert.deepEqual(C.SCHOOL_PRESETS.map(p=>p.id),['generic','bupt','buct']);
+  const bupt=C.schoolPreset('bupt'),buct=C.schoolPreset('buct');
+  assert.equal(bupt.url,'https://jwgl.bupt.edu.cn/');
+  assert.match(bupt.label,/北京邮电大学/);
+  assert.match(bupt.label,/强智/);
   assert.equal(buct.url,'http://jwglxt.buct.edu.cn');
   assert.match(buct.label,/北京化工大学/);
+  assert.match(buct.label,/正方/);
+  assert.equal(C.schoolPreset('zhengfang').id,'generic');
   assert.equal(C.schoolPreset('missing').id,'generic');
-  assert.ok(C.SCHOOL_PRESETS.length>=3);
 });
-test('旧版内置学校默认值会被迁移，用户自定义学校名保持不变',()=>{
-  const migrated=C.sanitizeState({courses:[],settings:{schoolName:'北京邮电大学',schoolUrl:'https://auth.bupt.edu.cn/',semesterStart:'2026-09-07'}});
-  assert.equal(migrated.settings.schoolName,'我的学校');
-  assert.equal(migrated.settings.schoolUrl,'');
-  assert.equal(migrated.settings.schoolPreset,'generic');
+test('旧版内置默认值只迁移一次；之后手填“北京邮电大学”不再被改写',()=>{
+  const legacy=C.sanitizeState({version:1,courses:[],settings:{schoolName:'北京邮电大学',schoolUrl:'https://auth.bupt.edu.cn/',semesterStart:'2026-09-07'}});
+  assert.equal(legacy.settings.schoolName,'北京邮电大学');
+  assert.equal(legacy.settings.schoolPreset,'bupt');
+  assert.equal(legacy.settings.schoolUrl,'https://jwgl.bupt.edu.cn/');
+  assert.equal(legacy.version,2);
+  // 迁移之后保存的 state 带 version 2：用户手填的学校名与网址必须原样保留
+  const edited=C.sanitizeState({version:2,courses:[],settings:{schoolName:'北京邮电大学',schoolUrl:'https://auth.bupt.edu.cn/'}});
+  assert.equal(edited.settings.schoolName,'北京邮电大学');
+  assert.equal(edited.settings.schoolUrl,'https://auth.bupt.edu.cn/');
+  assert.equal(edited.settings.schoolPreset,'generic');
+  // 无版本的旧备份按 legacy 处理，自定义学校名不受影响
   const kept=C.sanitizeState({courses:[],settings:{schoolName:'某某大学',schoolUrl:'https://jw.example.edu.cn/'}});
   assert.equal(kept.settings.schoolName,'某某大学');
   assert.equal(kept.settings.schoolUrl,'https://jw.example.edu.cn/');

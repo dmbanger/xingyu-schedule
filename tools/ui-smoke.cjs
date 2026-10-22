@@ -49,13 +49,24 @@ const {pathToFileURL}=require('node:url');
   assert.ok(zfText.includes('实验楼301')&&zfText.includes('教305'),'正方合并单元格拆分');
   assert.ok(zfText.includes('1,3,5,7,9,11,13,15'),'正方单周');
   await page.locator('[data-action="close"]').click();
-  // School presets: 北化 正方 entry prefills the URL and no school-specific copy remains.
+  // School presets: 北邮 强智 与 北化 正方 各自预填网址，徽标跟着变。
   await page.locator('#navigation [data-tab="import"]').click();
+  assert.deepEqual(await page.evaluate(()=>[...document.querySelectorAll('#school-preset option')].map(o=>o.value)),['generic','bupt','buct']);
+  await page.locator('#school-preset').selectOption('bupt');
+  assert.equal(await page.locator('#school-url').inputValue(),'https://jwgl.bupt.edu.cn/');
+  assert.ok((await page.locator('.import-hero .badge').innerText()).includes('强智'));
   await page.locator('#school-preset').selectOption('buct');
   assert.equal(await page.locator('#school-url').inputValue(),'http://jwglxt.buct.edu.cn');
   assert.ok((await page.locator('.import-hero .badge').innerText()).includes('正方'));
-  assert.ok(!(await page.locator('body').innerText()).includes('北京邮电大学'),'不应残留单一学校的文案');
   await page.locator('#school-preset').selectOption('generic');
+  // 回归：设置里手填“北京邮电大学”必须原样保存，不能被旧默认值迁移逻辑改写。
+  await page.locator('#navigation [data-tab="settings"]').click();
+  await page.locator('[data-action="school-name"]').click();
+  await page.fill('#school-name-form [name="name"]','北京邮电大学');
+  await page.getByRole('button',{name:'保存',exact:true}).click();
+  await page.reload();
+  const savedName=await page.evaluate(()=>JSON.parse(localStorage.getItem('xingyu-state')).settings.schoolName);
+  assert.equal(savedName,'北京邮电大学','手填的学校名被改写');
   // Input values, scripts, and hidden login forms must not be captured by the school extractor.
   const school=await context.newPage();await school.setContent('<form><input value="private-password"></form><table><tr><td>星期一</td></tr><tr><td>课程甲<br><span title="教师">王老师</span><br>1-16周[01-02节]<br><span title="教室">教三201</span></td></tr></table>');
   const script=require('../app/src/main/assets/core.js').snapshotScript();
@@ -75,6 +86,6 @@ const {pathToFileURL}=require('node:url');
   await desktopTest.evaluate(fs.readFileSync(path.join(__dirname,'../app/src/main/assets/desktop-viewport.js'),'utf8'));
   await desktopTest.waitForFunction(()=>innerWidth>=1280);assert.equal(await desktopTest.locator('meta[name="viewport"]').getAttribute('content'),'width=1280');
   assert.deepEqual(errors,[]);
-  fs.writeFileSync(path.join(output,'ui-smoke-result.json'),JSON.stringify({passed:true,checks:['empty state','demo isolation','course creation','reload persistence','themes','CSV preview and replace','import rollback','强智 demo import','正方 demo import with 单周 and merged cell','school preset prefills 北化 正方 entry, no single-school copy','school extractor excludes form values','untrusted text rendering','phone widths'],pageErrors:errors},null,2));
-  console.log('UI smoke: 13 flows passed; screenshots: '+output);await browser.close();
+  fs.writeFileSync(path.join(output,'ui-smoke-result.json'),JSON.stringify({passed:true,checks:['empty state','demo isolation','course creation','reload persistence','themes','CSV preview and replace','import rollback','强智 demo import','正方 demo import with 单周 and merged cell','school presets: 北邮强智 + 北化正方 prefill and badges','manually typed school name survives reload','school extractor excludes form values','untrusted text rendering','phone widths'],pageErrors:errors},null,2));
+  console.log('UI smoke: 14 flows passed; screenshots: '+output);await browser.close();
 })().catch(e=>{console.error(e);process.exit(1);});
