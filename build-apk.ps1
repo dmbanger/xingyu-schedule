@@ -21,6 +21,7 @@ function Run-Checked([string]$program, [string[]]$arguments) {
     if ($LASTEXITCODE -ne 0) { throw "Build step failed: $program (exit $LASTEXITCODE)" }
 }
 Run-Checked 'node' @((Join-Path $projectRoot 'tools\generate-extractor.cjs'))
+Run-Checked 'node' @((Join-Path $projectRoot 'tools\generate-version.cjs'))
 $env:JAVA_HOME = $JavaHome
 $env:PATH = (Join-Path $JavaHome 'bin') + ';' + $env:PATH
 $resources = Join-Path $taskBuild 'resources.zip'

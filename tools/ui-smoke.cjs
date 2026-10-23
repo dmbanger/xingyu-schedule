@@ -99,6 +99,11 @@ const {pathToFileURL}=require('node:url');
   await page.reload();
   const savedName=await page.evaluate(()=>JSON.parse(localStorage.getItem('xingyu-state')).settings.schoolName);
   assert.equal(savedName,'北京邮电大学','手填的学校名被改写');
+  // 设置页底部显示跟随 version.properties 的版本号与创作者水印
+  await page.locator('#navigation [data-tab="settings"]').click();
+  const footerText=await page.locator('.settings-footer').innerText();
+  assert.ok(/星屿课表 v\d+\.\d+\.\d+/.test(footerText),'设置页应显示版本号');
+  assert.ok(footerText.includes('暗物质鞭炮'),'设置页应有创作者水印');
   // Input values, scripts, and hidden login forms must not be captured by the school extractor.
   const school=await context.newPage();await school.setContent('<form><input value="private-password"></form><table><tr><td>星期一</td></tr><tr><td>课程甲<br><span title="教师">王老师</span><br>1-16周[01-02节]<br><span title="教室">教三201</span></td></tr></table>');
   const script=require('../app/src/main/assets/core.js').snapshotScript();
