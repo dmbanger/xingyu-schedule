@@ -41,8 +41,9 @@ const {pathToFileURL}=require('node:url');
   // Today uses the configured semester, returns from a different week and focuses the day.
   await page.evaluate(()=>{
     const s=ScheduleCore.defaultState(),now=new Date(),start=ScheduleCore.monday(now);start.setDate(start.getDate()-21);
-    s.settings.semesterStart=ScheduleCore.dateString(start);s.settings.semesterConfigured=true;
-    s.courses=ScheduleCore.normalizeCourses([{id:'today-course',name:'今日课程验证',day:(now.getDay()+6)%7+1,start:1,end:2,weeks:'1-20',room:'测试教室'}]);
+    const t=s.timetables[0];
+    t.semesterStart=ScheduleCore.dateString(start);t.semesterConfigured=true;
+    t.courses=ScheduleCore.normalizeCourses([{id:'today-course',name:'今日课程验证',day:(now.getDay()+6)%7+1,start:1,end:2,weeks:'1-20',room:'测试教室'}]);
     localStorage.setItem('xingyu-state',JSON.stringify(s));
   });
   await page.reload();assert.equal(await week(),4);
@@ -60,7 +61,7 @@ const {pathToFileURL}=require('node:url');
   await page.emulateMedia({reducedMotion:'reduce'});await page.locator('[data-action="next-week"]').click();
   assert.equal(await week(),5);assert.equal(await page.locator('.week-outgoing').count(),0);assert.ok((await page.locator('#week-feedback').innerText()).includes('5 / 20'));
   // Dates outside the semester must not silently jump to its first or last week.
-  await page.evaluate(()=>{const s=JSON.parse(localStorage.getItem('xingyu-state')),d=ScheduleCore.monday(new Date());d.setDate(d.getDate()+56);s.settings.semesterStart=ScheduleCore.dateString(d);localStorage.setItem('xingyu-state',JSON.stringify(s));});
+  await page.evaluate(()=>{const s=JSON.parse(localStorage.getItem('xingyu-state')),d=ScheduleCore.monday(new Date());d.setDate(d.getDate()+56);const t=s.timetables.find(x=>x.id===s.activeId);t.semesterStart=ScheduleCore.dateString(d);localStorage.setItem('xingyu-state',JSON.stringify(s));});
   await page.reload();await page.locator('#today-button').click();assert.equal(await week(),1);assert.ok((await page.locator('#toast').innerText()).includes('不在当前学期'));
   await page.evaluate(()=>localStorage.removeItem('xingyu-state'));await page.reload();await page.locator('#today-button').click();await page.locator('#semester-form').waitFor();
   assert.deepEqual(errors,[]);

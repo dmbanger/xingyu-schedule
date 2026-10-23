@@ -49,3 +49,6 @@ body[data-theme=night] .today-fab{color:#292039}
 .timetable-tools{display:flex;gap:6px;flex:none}
 .timetable-tools .text-button{font-size:10px;white-space:nowrap}
 body[data-theme=night] .timetable-item{background:rgba(43,40,67,.55)}
+
+/* 识别失败时的提示保留换行，便于核对单元格原文 */
+.notice.warning{white-space:pre-wrap}

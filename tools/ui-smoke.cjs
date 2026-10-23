@@ -103,15 +103,34 @@ const {pathToFileURL}=require('node:url');
   const school=await context.newPage();await school.setContent('<form><input value="private-password"></form><table><tr><td>星期一</td></tr><tr><td>课程甲<br><span title="教师">王老师</span><br>1-16周[01-02节]<br><span title="教室">教三201</span></td></tr></table>');
   const script=require('../app/src/main/assets/core.js').snapshotScript();
   const captured=await school.evaluate(script);assert.ok(!captured.includes('private-password'));assert.ok(captured.includes('【教师】'));assert.ok(captured.includes('教三201'));
-  // 正方把每个字段放进 display:block 的 span 且没有 <br>：抽取时必须按渲染换行，不能粘连。
+  // 北化正方：字段是行内 span，中间只有空图标（display:block），没有任何 <br>。
+  // 抽取必须按渲染坐标换行，否则整格文字会粘连成一行。
   const buctPage=await context.newPage();
-  await buctPage.setContent('<style>.b{display:block}</style><table><tr><td>节次</td><td>星期一</td><td>星期二</td><td>星期三</td><td>星期四</td><td>星期五</td><td>星期六</td><td>星期日</td></tr><tr><td>第1节</td><td><span class="b">示例实验课程 B (I)</span><span class="b">◉(1-4节)11-18周</span><span class="b">📍示例校区 未排地点</span><span class="b">👤示例教师戊</span></td><td></td><td></td><td></td><td></td><td></td><td></td></tr></table>');
+  await buctPage.setContent([
+    '<style>td{width:150px;vertical-align:top} .ic{display:block;height:8px}</style>',
+    '<table><tr><td>节次</td><td>星期一</td><td>星期二</td><td>星期三</td><td>星期四</td><td>星期五</td><td>星期六</td><td>星期日</td></tr>',
+    '<tr><td>第1节</td><td>',
+    '<i class="ic"></i><span>示例程序设计★</span>',
+    '<i class="ic"></i><span>(1-2节)1-9周,11-13周</span>',
+    '<i class="ic"></i><span title="地点">示例楼-A-101</span>',
+    '<i class="ic"></i><span title="教师">示例教师</span>',
+    '<i class="ic"></i><span>示例程序设计-0005</span>',
+    '<i class="ic"></i><span>考查</span>',
+    '<i class="ic"></i><span>2.0</span>',
+    '<i class="ic"></i><span>示例数学A★</span>',
+    '<i class="ic"></i><span>(3-4节)1-5周,7-8周</span>',
+    '<i class="ic"></i><span title="地点">示例楼 A-101</span>',
+    '<i class="ic"></i><span title="教师">示例教师辛</span>',
+    '<i class="ic"></i><span>考试</span>',
+    '</td><td></td><td></td><td></td><td></td><td></td><td></td></tr></table>'
+  ].join(''));
   const buctCaptured=JSON.parse(await buctPage.evaluate(script));
   const buctCellText=buctCaptured.tables[0].rows[1].cells[1].text;
-  assert.ok(buctCellText.split('\n').filter(Boolean).length>=4,'display:block 的字段应各占一行');
+  assert.ok(buctCellText.split('\n').filter(Boolean).length>=10,'行内字段应按渲染坐标各占一行');
   const buctParsed=require('../app/src/main/assets/core.js').parseSchoolSnapshot(buctCaptured);
-  assert.equal(buctParsed.courses.length,1);
-  assert.deepEqual([buctParsed.courses[0].name,buctParsed.courses[0].teacher,buctParsed.courses[0].room],[ '示例实验课程 B (I)','示例教师戊','示例校区 未排地点']);
+  assert.equal(buctParsed.courses.length,2,'一格两门课应拆成两条');
+  assert.deepEqual(buctParsed.courses.map(c=>[c.name,c.teacher,c.room]),[['示例程序设计','示例教师','示例楼-A-101'],['示例数学A','示例教师辛','示例楼 A-101']]);
+  assert.deepEqual(buctParsed.courses.map(c=>[c.start,c.end,c.weeks.length]),[[1,2,12],[3,4,7]]);
   // File-derived text is displayed as text, including characters that resemble HTML.
   await page.locator('[data-tab="import"]').click();
   await page.evaluate(()=>window.receiveImportFile(JSON.stringify({courses:[{name:'<img src=x onerror=alert(1)>',day:1,start:1,end:2,weeks:'1-16'}]})));
