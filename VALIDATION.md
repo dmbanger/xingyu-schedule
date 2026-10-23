@@ -2,6 +2,8 @@
 
 日期：2026-10-22。
 
+0.3.9 验证（整列高亮）：`renderTimetable()` 在网格里为今天那一列插入 `.today-column`（`grid-column: 今天+1`、`grid-row: 1 / span 节次数`），元素排在课程卡片之前，所以底色在卡片之下；`focusTodayCourses()` 给它与日期栏同时加高亮类，播放 1.6 秒的强调色淡入淡出（前 42% 保持，之后淡出）。浏览器实测：该元素与网格同高（648px）、宽 48.7px，点「今」后 `background-color` 为 `rgb(234,228,250)`、`box-shadow` 为 2px 内描边，1.6 秒后恢复透明；`motion-smoke`、`swipe-smoke`、`ui-smoke` 16 个流程、29 项单元测试全部通过。真机（Android 测试设备，versionCode 17）：点「今」时周五整列由日期栏到底部第 12 节一起高亮，课程卡片仍在底色之上可正常阅读。
+
 0.3.8 验证（「今」的落点）：以前 `focusTodayCourses()` 会滚到今天正在上或下一门课的卡片位置（还额外减了 46px 偏移），所以点完「今」课表停在中段。现改为滚到课表顶部：取 `.week-stage` 相对 `#content` 的偏移并减去当前滚动量，使日期栏对齐滚动区顶部、第 1 节紧接其下；今日高亮动画与日期提示保持不变，从任意周跳回来都一致。浏览器实测：先把内容滚到 320，再点「今」，`scrollTop` 变为 165，`.week-stage` 顶部与 `#content` 顶部同为 44（差 0px），日期栏 top=45（1px 边框），第 1 节（1 / 08:00 / 08:45）紧接在下方 96 处。`motion-smoke`（含“今”按钮相关全部断言）、`swipe-smoke`、`ui-smoke` 16 个流程通过；真机（Android 测试设备，versionCode 16）从第 3 周先下滑一段再点「今」，日期栏停在上方、第 1 节紧接其下，周五 23 仍高亮。
 
 0.3.7 验证（翻周更顺）：先用浏览器实测定位瓶颈——带 `backdrop-filter` 时拖动第一帧最长 16.6ms，去掉模糊后 6.7ms。据此做了五项优化：① 吸顶日期栏与周次提示去掉 `backdrop-filter`，改用接近不透明的底色（吸顶栏 `rgba(252,251,255,.985)` / 夜间 `#2b2843`，提示条改用新增的 `--panel-solid`）；② 拖动改为手势对象：尺寸、页面与预览节点引用在 `pointerdown` 缓存，`pointermove` 用 rAF 合并，每帧只写两个 `transform`；③ 空闲（`requestIdleCallback`）预渲染左右相邻两周并缓存，`pointerdown` 前就用缓存页；④ 周次提示只在跨周时更新；⑤ `persist()` 后清空相邻页缓存。验证：浏览器冷拖动最长帧 16.6 → 6.7ms；`swipe-smoke`（左右切周、首尾边界、滚动、不误触课程、多指不切周）、`ui-smoke` 16 个流程、`motion-smoke` 全部通过；真机（Android 测试设备，versionCode 15）用 800ms 慢速滑动，`dumpsys gfxinfo` 记录 256 帧、janky 0.39%、90 分位 10ms、95 分位 20ms，中途截图可见相邻周跟手。注：曾尝试降级回 0.3.6 做同手势 A/B，但 HyperOS 拒绝降级安装（`INSTALL_FAILED_VERSION_DOWNGRADE`），且不能用卸载方式对比（会清掉用户数据），因此对比以浏览器数据为准。

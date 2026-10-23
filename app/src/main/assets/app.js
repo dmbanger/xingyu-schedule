@@ -186,6 +186,8 @@ function focusTodayCourses(){
     content.scrollTo({top:Math.max(0,Math.round(top)),behavior:reducedMotion()?'auto':'smooth'});
   }
   const header=$('.day.today');if(header){header.classList.remove('today-focus');void header.offsetWidth;header.classList.add('today-focus');}
+  const column=document.querySelector('.week-page:not(.week-track-page) .today-column');
+  if(column){column.classList.remove('flash');void column.offsetWidth;column.classList.add('flash');}
   showWeekFeedback(viewWeek,false,'今天 '+(now.getMonth()+1)+'月'+now.getDate()+'日');
 }
 function jumpToToday(){
@@ -264,6 +266,8 @@ function renderTimetable(week){
   html+='</div><div class="grid-body">';
   const weekCourses=visibleCourses().filter(c=>c.weeks.includes(week)),periods=Math.max(s.periods,...weekCourses.map(c=>c.end));
   for(let p=1;p<=periods;p++){const slot=s.times[p-1]||'',startsAt=slot.slice(0,5),endsAt=slot.slice(6),range=endsAt?startsAt+'–'+endsAt:startsAt;html+='<div class="period-label" style="grid-column:1;grid-row:'+p+'" title="第 '+p+' 节 '+escapeHTML(range)+'">'+p+'<span class="time-start">'+escapeHTML(startsAt)+'</span>'+(endsAt?'<span class="time-end">'+escapeHTML(endsAt)+'</span>':'')+'</div>';for(let d=1;d<=7;d++)html+='<div class="grid-cell" style="grid-column:'+(d+1)+';grid-row:'+p+'"></div>';}
+  const todayCol=(()=>{for(let i=0;i<7;i++){const d=new Date(start);d.setDate(d.getDate()+i);if(C.dateString(d)===today)return i+1;}return 0;})();
+  if(todayCol)html+='<div class="today-column" data-day="'+todayCol+'" style="grid-column:'+(todayCol+1)+';grid-row:1 / span '+periods+'"></div>';
   for(let day=1;day<=7;day++){
     const list=weekCourses.filter(c=>c.day===day).sort((a,b)=>a.start-b.start),groups=[];
     for(const c of list){const last=groups[groups.length-1];if(last&&c.start<=last.end){last.items.push(c);last.end=Math.max(last.end,c.end);}else groups.push({start:c.start,end:c.end,items:[c]});}
