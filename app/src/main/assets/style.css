@@ -30,8 +30,8 @@ dialog{padding:0;width:calc(100% - 22px);max-width:490px;border:1px solid #fff8;
 .today-fab{position:absolute;right:25px;bottom:94px;z-index:15;width:48px;height:48px;display:grid;place-items:center;border:1px solid #ffffff80;border-radius:50%;background:var(--accent);color:#fff;font-size:21px;font-weight:650;box-shadow:0 5px 18px #55416a38;touch-action:manipulation}
 .today-fab[hidden]{display:none}.today-fab:active{transform:scale(.94)}
 body[data-theme=night] .today-fab{color:#292039}
-.day.today-focus{animation:today-highlight 1s ease-out}
-@keyframes today-highlight{0%,40%{background:var(--accent-wash);box-shadow:inset 0 0 0 2px var(--accent-ring);border-radius:9px}100%{background:transparent;box-shadow:inset 0 0 0 0 transparent}}
+.day.today-focus{animation:today-highlight var(--today-flash,1.6s) ease-out}
+@keyframes today-highlight{0%,42%{background:var(--accent-wash);box-shadow:inset 0 0 0 2px var(--accent-ring);border-radius:9px}100%{background:transparent;box-shadow:inset 0 0 0 0 transparent}}
 @media(min-width:700px){.today-fab{right:40px;bottom:102px}}
 @media(prefers-reduced-motion:reduce){.day.today-focus{animation:none}}
 
@@ -60,7 +60,7 @@ body[data-theme=night] .timetable-item{background:rgba(43,40,67,.55)}
 .week-track-page{position:absolute;top:0;pointer-events:none}
 /* 点「今」：整列课表高亮，与日期栏的高亮同时播放 */
 .today-column{pointer-events:none;border-radius:11px;background:transparent;box-shadow:inset 0 0 0 0 transparent}
-.today-column.flash{animation:today-column-flash 1.6s ease-out}
+.today-column.flash{animation:today-column-flash var(--today-flash,1.6s) ease-out}
 @keyframes today-column-flash{0%,42%{background:var(--accent-wash);box-shadow:inset 0 0 0 2px var(--accent-ring)}100%{background:transparent;box-shadow:inset 0 0 0 0 transparent}}
 @media(prefers-reduced-motion:reduce){.today-column.flash{animation:none}}
 /* 设置页底部：版本号与创作者水印 */
@@ -72,3 +72,12 @@ body[data-theme=night] .timetable-item{background:rgba(43,40,67,.55)}
 #content[data-tab=schedule] .week-toolbar{margin-top:12px}
 .day-header{position:sticky;top:0;z-index:6;background:rgba(252,251,255,.985);box-shadow:0 6px 16px #3b2f5514}
 body[data-theme=night] .day-header{background:#2b2843}
+
+/* 沉浸阅读：点课表空白处收起顶部栏与底部导航，课表区域随之变高，再点一次恢复 */
+.app-header{max-height:44px;transition:max-height .3s cubic-bezier(.22,.7,.2,1),opacity .22s ease,padding .3s ease;overflow:hidden}
+#navigation{max-height:96px;transition:max-height .3s cubic-bezier(.22,.7,.2,1),opacity .22s ease,padding .3s ease,margin .3s ease;overflow:hidden}
+.today-fab{transition:bottom .3s cubic-bezier(.22,.7,.2,1),transform .12s ease}
+body.immersive .app-header{max-height:0;min-height:0;padding-top:0;padding-bottom:0;opacity:0;pointer-events:none}
+body.immersive #navigation{max-height:0;padding-top:0;padding-bottom:0;margin-bottom:0;border-width:0;opacity:0;pointer-events:none}
+body.immersive .today-fab{bottom:22px}
+@media(prefers-reduced-motion:reduce){.app-header,#navigation,.today-fab{transition:none}}

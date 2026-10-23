@@ -48,7 +48,7 @@ function applyTheme(){
   appliedBackground=url;
   $('#wallpaper').style.backgroundImage=url?'url("'+url.replace(/["\\\n\r]/g,'')+'")':'';
 }
-function render(){stopWeekMotion();applyTheme();$('#today-button').hidden=tab!=='schedule';$('#content').dataset.tab=tab;if(tab!=='schedule')$('#week-feedback').classList.remove('visible');$('#navigation').innerHTML=[['schedule','calendar','课表'],['import','download','导入'],['theme','palette','装扮'],['settings','settings','设置']].map(([id,ico,label])=>'<button class="nav-item '+(tab===id?'active':'')+'" data-action="tab" data-tab="'+id+'" aria-current="'+(tab===id?'page':'false')+'"><span class="nav-icon">'+icon(ico)+'</span>'+label+'</button>').join('');$('#content').innerHTML=({schedule:renderSchedule,import:renderImport,theme:renderTheme,settings:renderSettings}[tab])();bindView();if(tab==='schedule')primeNeighbours();}
+function render(){stopWeekMotion();applyTheme();$('#today-button').hidden=tab!=='schedule';$('#content').dataset.tab=tab;if(tab!=='schedule'){document.body.classList.remove('immersive');$('#week-feedback').classList.remove('visible');}$('#navigation').innerHTML=[['schedule','calendar','课表'],['import','download','导入'],['theme','palette','装扮'],['settings','settings','设置']].map(([id,ico,label])=>'<button class="nav-item '+(tab===id?'active':'')+'" data-action="tab" data-tab="'+id+'" aria-current="'+(tab===id?'page':'false')+'"><span class="nav-icon">'+icon(ico)+'</span>'+label+'</button>').join('');$('#content').innerHTML=({schedule:renderSchedule,import:renderImport,theme:renderTheme,settings:renderSettings}[tab])();bindView();if(tab==='schedule')primeNeighbours();}
 function go(next){tab=next;render();$('#content').scrollTop=0;}
 function visibleCourses(){return sample?demo:T().courses;}
 function reducedMotion(){return matchMedia('(prefers-reduced-motion: reduce)').matches;}
@@ -341,7 +341,7 @@ window.receiveSchoolSnapshot=text=>{try{window.__rawSnapshot=text;showImport(C.p
 function snapshotFromHTML(html){const doc=new DOMParser().parseFromString(html,'text/html');return {tables:Array.from(doc.querySelectorAll('table')).map(table=>({rows:Array.from(table.rows).map(row=>({cells:Array.from(row.cells).map(cell=>C.cellSnapshot(doc,cell))}))}))};}
 window.receiveImportFile=text=>{try{text=text.replace(/^\uFEFF/,'').trim();if(text.length>2*1024*1024)throw new Error('文件过大，请选择小于 2 MB 的课表文件');if(text.startsWith('{')||text.startsWith('[')){const data=JSON.parse(text);if(Array.isArray(data))showImport({courses:data});else if(Array.isArray(data.timetables)){const checked=C.sanitizeState(data);showImport({timetables:checked.timetables,settings:checked.settings,activeId:checked.activeId});}else if(Array.isArray(data.courses)){const checked=C.sanitizeState(data),first=checked.timetables[0];showImport({courses:first.courses,settings:data.settings?{...checked.settings,...pickSemester(first)}:null});}else throw new Error('不是星屿课表 JSON 格式，请使用 CSV、课表 HTML 或在教务页面识别');}else if(text.startsWith('<'))showImport(C.parseSchoolSnapshot(snapshotFromHTML(text)));else showImport({courses:C.parseCSV(text)});}catch(e){importError(e.message);}};
 window.receiveBackground=()=>{customWallpaperURL='';appliedBackground='';if(updateSettings({background:'custom'})){render();toast('背景已更换，只保存在本机');}};
-window.handleNativeBack=()=>{if($('#sheet').open){closeSheet();return true;}if(tab!=='schedule'){go('schedule');return true;}if(sample){sample=false;render();return true;}return false;};
+window.handleNativeBack=()=>{if($('#sheet').open){closeSheet();return true;}if(document.body.classList.contains('immersive')){setImmersive(false);return true;}if(tab!=='schedule'){go('schedule');return true;}if(sample){sample=false;render();return true;}return false;};
 const actions={
   tab:b=>go(b.dataset.tab),add:()=>courseForm(),edit:b=>courseForm(b.dataset.id),close:closeSheet,detail:b=>detail(b.dataset.id),semester:semesterForm,today:jumpToToday,'switch-timetable':timetableSheet,timetable:timetableSheet,'select-timetable':b=>switchTimetable(b.dataset.id),'new-timetable':newTimetableForm,'rename-timetable':b=>renameTimetableForm(b.dataset.id),'delete-timetable':b=>deleteTimetable(b.dataset.id),
   'prev-week':()=>changeWeek(-1),'next-week':()=>changeWeek(1),'week-picker':showWeekPicker,'set-week':b=>{const next=+b.dataset.week;closeSheet();navigateToWeek(next);},'this-week':()=>{closeSheet();jumpToToday();},
@@ -387,6 +387,15 @@ const actions={
 };
 document.addEventListener('click',e=>{if(Date.now()<suppressCourseClickUntil&&e.target.closest('.timetable')){e.preventDefault();e.stopImmediatePropagation();}},{capture:true});
 document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(b&&!b.disabled&&actions[b.dataset.action])actions[b.dataset.action](b);});
+// 沉浸阅读：点课表上的空白处收起顶部栏与底部导航，再点一次恢复。
+function setImmersive(on){document.body.classList.toggle('immersive',!!on);}
+document.addEventListener('click',e=>{
+  if(tab!=='schedule'||$('#sheet').open)return;
+  if(Date.now()<suppressCourseClickUntil)return;
+  if(!$('#content')||!$('#content').contains(e.target))return;
+  if(e.target.closest('[data-action],button,a,input,select,textarea,label,summary'))return;
+  setImmersive(!document.body.classList.contains('immersive'));
+});
 document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches('[role=button][data-action]')){e.preventDefault();e.target.click();}});
 $('#sheet').addEventListener('click',e=>{if(e.target===$('#sheet')){const r=$('#sheet').getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)closeSheet();}});
 $('#browser-import').onchange=async e=>{const file=e.target.files[0];if(file){if(file.size>2*1024*1024)importError('请选择小于 2 MB 的文件');else window.receiveImportFile(await file.text());}e.target.value='';};

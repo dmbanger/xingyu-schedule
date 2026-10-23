@@ -2,6 +2,8 @@
 
 日期：2026-10-22。
 
+0.3.11 验证：**① 高亮同步**：日期栏（`today-highlight`）与整列（`today-column-flash`）原来分别是 1s/1.6s、40%/42% 的节奏，现在都用 `var(--today-flash,1.6s)` 与 `0%,42%` 停点，浏览器读出的 `animation-duration` 两处均为 `1.6s`。**② 沉浸阅读**：新增 `body.immersive` 状态，`.app-header` 与 `#navigation` 用 `max-height` + padding/border/opacity 过渡收起（`#content` 是 flex:1，所以课表区域随之变高），“今”按钮同时下移。触发条件是课表页上点空白处：点击目标不在 `[data-action], button, a, input, select, textarea, label, summary` 里、不在滑动后的抑制窗口内、且弹层未打开。浏览器实测：收起后 header 44→0、nav 68→0、内容 730→852，再点恢复原值；点课程卡片只打开详情、不改沉浸状态；离开课表页自动恢复；返回键优先恢复。`ui-smoke` 16 个流程、`swipe-smoke`、`motion-smoke` 全部通过。真机（Android 测试设备，versionCode 19）：点空白后顶部品牌栏与底部导航收起、课表占满整屏（截图），再点一次恢复。
+
 0.3.10 验证（高亮改为半透明）：日期栏高亮（`today-highlight`）与整列高亮（`today-column-flash`）原来用不透明的 `--accent-soft`，会盖住壁纸。改为新增的 `--accent-wash` / `--accent-ring` 变量：浅色 `rgba(119,98,198,.17)` / `.55`、樱花 `rgba(179,111,139,.17)` / `.55`、夜间 `rgba(183,161,241,.2)` / `.58`，两处 keyframes 都引用它们，主题在变量层切换。浏览器实测点「今」后列高亮 `background-color` 为 `rgba(119,98,198,0.17)`、描边 `rgba(119,98,198,0.55)`，截图可见壁纸透过底色。`ui-smoke` 16 个流程与 `motion-smoke` 通过；真机（Android 测试设备，versionCode 18，自定义壁纸）周五整列高亮时壁纸与课程卡片都清晰可见。
 
 0.3.9 验证（整列高亮）：`renderTimetable()` 在网格里为今天那一列插入 `.today-column`（`grid-column: 今天+1`、`grid-row: 1 / span 节次数`），元素排在课程卡片之前，所以底色在卡片之下；`focusTodayCourses()` 给它与日期栏同时加高亮类，播放 1.6 秒的强调色淡入淡出（前 42% 保持，之后淡出）。浏览器实测：该元素与网格同高（648px）、宽 48.7px，点「今」后 `background-color` 为 `rgb(234,228,250)`、`box-shadow` 为 2px 内描边，1.6 秒后恢复透明；`motion-smoke`、`swipe-smoke`、`ui-smoke` 16 个流程、29 项单元测试全部通过。真机（Android 测试设备，versionCode 17）：点「今」时周五整列由日期栏到底部第 12 节一起高亮，课程卡片仍在底色之上可正常阅读。
