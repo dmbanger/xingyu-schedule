@@ -229,6 +229,48 @@
     }
     return [text];
   }
+  // 正方可能把整格内容压成一行（真实导出的北化页面就是这样）。用 (a-b节) 标记切出每门课，
+  // 上一门课末尾的学分（如 2.0）之后紧接的就是下一门课的课程名。
+  function parseGlued(text,day,index){
+    const source=String(text||'');
+    const re=/[（(](\d{1,2})-(\d{1,2})节[）)]/g;
+    const marks=[];let m;
+    while((m=re.exec(source)))marks.push({start:+m[1],end:+m[2],at:m.index,after:re.lastIndex});
+    if(!marks.length)return null;
+    const nameStart=[];
+    for(let k=0;k<marks.length;k++){
+      const from=k===0?0:marks[k-1].after,seg=source.slice(from,marks[k].at);
+      let cut=0;const credits=[...seg.matchAll(/\d\.\d/g)];
+      if(credits.length){const last=credits[credits.length-1];cut=last.index+last[0].length;}
+      nameStart.push(from+cut);
+    }
+    const out=[];
+    for(let k=0;k<marks.length;k++){
+      const mk=marks[k];
+      const name=stripMarks(source.slice(nameStart[k],mk.at));
+      if(!name)continue;
+      const tailEnd=k+1<marks.length?nameStart[k+1]:source.length;
+      const tail=source.slice(mk.after,tailEnd);
+      const weeksPart=tail.split(/【地点】|【教师】/)[0]||'';
+      let weeks=null;
+      try{const found=[...weeksPart.matchAll(/\d[\d\s,，、\-—–~～至]*(?:\(周\)|（周）|周)(?:[（(]?[单双]周?[）)]?)?/g)];if(found.length)weeks=parseWeeks(found.flatMap(x=>parseWeeks(x[0])));}catch(e){}
+      if(!weeks)continue;
+      const roomM=tail.match(/【地点】([^【]*)/),teacherM=tail.match(/【教师】([^【]*)/);
+      const room=roomM?stripMarks(roomM[1]):'';
+      let teacher='';
+      if(teacherM){
+        // 教师名后面紧跟重复的课程名（"示例教师示例程序设计-0005"），按课程名截断；
+        // 截不到时退回“2–4 个汉字 + 可选数字”的写法（例如"体育专聘1"）。
+        let raw=teacherM[1];
+        const at=name?raw.indexOf(name):-1;
+        if(at>0)raw=raw.slice(0,at);
+        if(at<=0){const lead=teacherM[1].match(/^[\u4e00-\u9fa5·]{2,4}\d?/);raw=lead?lead[0]:'';}
+        teacher=stripMarks(raw);
+      }
+      out.push(validateCourse({name:name.slice(0,100),teacher:teacher.slice(0,100),room:room.slice(0,100),day,start:mk.start,end:mk.end,weeks,color:['lavender','mint','sky','rose','peach','lemon'][index%6]}));
+    }
+    return out.length?out:null;
+  }
   function parseSchoolSnapshot(snapshot){
     if(!snapshot||!Array.isArray(snapshot.tables))throw new Error('未找到课表表格，请进入个人课表页面再识别');
     let courses=[],warnings=[],matched=false;
@@ -244,7 +286,7 @@
         for(const {cell,col,rowSpan,colSpan} of orig[r]||[]){const day=dayCols[col];if(!day)continue;const blocks=courseBlocks(cell);
           const spannedRows=rowPeriods.slice(r,r+rowSpan);let fallback=null;
           if(spannedRows.length===rowSpan&&spannedRows.every(Boolean))fallback=periodRanges(spannedRows.flatMap(ranges=>ranges.flatMap(([a,b])=>Array.from({length:b-a+1},(_,i)=>a+i))));
-          for(const block of blocks){try{if(colSpan>1&&Array.from({length:colSpan},(_,i)=>dayCols[col+i]).some(d=>d&&d!==day))throw new Error('单元格跨越多个星期，请手动确认上课日');const parsed=parseBlock(block,day,fallback,courses.length);if(parsed)courses.push(...parsed);}catch(e){if(String(block).trim())warnings.push('星期'+day+'：'+e.message);}}
+          for(const block of blocks){try{if(colSpan>1&&Array.from({length:colSpan},(_,i)=>dayCols[col+i]).some(d=>d&&d!==day))throw new Error('单元格跨越多个星期，请手动确认上课日');const parsed=parseBlock(block,day,fallback,courses.length);if(parsed)courses.push(...parsed);}catch(e){const glued=parseGlued(String(block),day,courses.length);if(glued&&glued.length){courses.push(...glued);}else if(String(block).trim()){warnings.push('星期'+day+'：'+e.message);}}}
         }
       }
     }

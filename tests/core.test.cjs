@@ -106,6 +106,31 @@ test('正方课表：课程名 / 教师 / 周次 / 节次 / 地点 分行的单�
   assert.deepEqual(c.weeks,[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]);
   assert.deepEqual(out.warnings,[]);
 });
+test('北化正方课表（模拟导出格式）：整格文字粘连成一行也能拆出课程',()=>{
+  // 下面三段使用虚构课程、教师和地点，仅保留导出结构与解析边界
+  const cellA='示例程序设计★(1-2节)1-9周,11-13周【地点】示例楼A-101【教师】示例教师示例程序设计-0005示例甲2501;示例甲2502;示例甲2503;示例甲2504;示例乙C2501;示例乙C2502;示例丙2501;示例丙2502;示例丁2501;示例丁2502考查讲课:24,上机:163242.0';
+  const cellB='示例实验课程B（I）○(1-4节)11-18周【地点】示例校区未排地点【教师】示例教师戊示例实验课程B（I）-0060示例丁2502考查实验:323321.0示例数学A★(3-4节)1-5周,7-8周【地点】示例楼A-101【教师】示例教师己示例数学A-0006示例乙C2501;示例乙C2502;示例丙2501;示例丙2502;示例丁2501;示例丁2502考试讲课:564563.5';
+  const cellC='示例语言课3★(6-7节)1-2周,4-5周,7-8周,11-13周(单),14-16周(双),17周【地点】示例楼D-202【教师】示例教师庚示例语言课3-00312025考试讲课:322322.0示例语言课3★(6-7节)3周,6周,9周,12周,15周【地点】示例楼F-203【教师】示例教师庚示例语言课3-00312025考试讲课:322322.0';
+  const rows=[header,
+    row(cell('1'),cell(cellA),cell(''),cell(''),cell(''),cell(''),cell(''),cell('')),
+    row(cell('2'),cell(''),cell(cellB),cell(''),cell(''),cell(''),cell(''),cell(''))];
+  const out=C.parseSchoolSnapshot({tables:[{rows}]});
+  assert.deepEqual(out.warnings,[]);
+  assert.equal(out.courses.length,3);
+  const [c1,c2,c3]=out.courses;
+  assert.deepEqual([c1.name,c1.teacher,c1.room,c1.day,c1.start,c1.end],['示例程序设计','示例教师','示例楼A-101',1,1,2]);
+  assert.deepEqual(c1.weeks,[1,2,3,4,5,6,7,8,9,11,12,13]);
+  assert.deepEqual([c2.name,c2.teacher,c2.room,c2.day,c2.start,c2.end],['示例实验课程B（I）','示例教师戊','示例校区未排地点',2,1,4]);
+  assert.deepEqual(c2.weeks,[11,12,13,14,15,16,17,18]);
+  assert.deepEqual([c3.name,c3.teacher,c3.start,c3.end],['示例数学A','示例教师己',3,4]);
+  assert.deepEqual(c3.weeks,[1,2,3,4,5,7,8]);
+  // 同一格两段不同周次 / 地点（模拟的示例语言课3 分两个教室上课）
+  const out2=C.parseSchoolSnapshot({tables:[{rows:[header,row(cell('1'),cell(cellC),cell(''),cell(''),cell(''),cell(''),cell(''),cell(''))]}]});
+  assert.equal(out2.courses.length,2);
+  assert.deepEqual(out2.courses.map(c=>[c.name,c.teacher,c.room]),[['示例语言课3','示例教师庚','示例楼D-202'],['示例语言课3','示例教师庚','示例楼F-203']]);
+  assert.deepEqual(out2.courses[0].weeks,[1,2,4,5,7,8,11,13,14,16,17]);
+  assert.deepEqual(out2.courses[1].weeks,[3,6,9,12,15]);
+});
 test('北化正方课表：图标前缀 + 每门课自带周次行 + 无空行分隔',()=>{
   const buctCell=[
     '示例实验课程 B (I) ○',
