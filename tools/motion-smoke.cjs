@@ -10,7 +10,7 @@ const {pathToFileURL}=require('node:url');
   await page.goto(pathToFileURL(path.join(__dirname,'../app/src/main/assets/index.html')).href);
   await page.getByRole('button',{name:'先看看装扮效果 →'}).click();
   const week=async()=>+(await page.locator('.week-current').innerText()).match(/\d+/)[0];
-  const settled=()=>page.waitForFunction(()=>document.querySelectorAll('.week-preview,.week-outgoing').length===0&&!document.querySelector('.week-moving'));
+  const settled=()=>page.waitForFunction(()=>document.querySelectorAll('.week-preview,.week-outgoing,.week-track').length===0&&!document.querySelector('.week-moving'));
   async function drag(x1,y1,x2,y2,end=true){
     await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:x1,y:y1,id:0}]});
     for(let i=1;i<=8;i++){

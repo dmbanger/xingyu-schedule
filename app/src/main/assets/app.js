@@ -28,8 +28,26 @@ try{const text=N?N.getState():localStorage.getItem('xingyu-state');if(text)state
 undoAvailable=!!getBackup();
 function currentWeek(){return C.weekAt(T().semesterStart);}
 viewWeek=Math.min(T().totalWeeks,Math.max(1,currentWeek()));
-function backgroundURL(){if(state.settings.background==='none')return '';if(state.settings.background==='custom')return N?'https://appassets.androidplatform.net/wallpaper?v='+Date.now():localStorage.getItem('xingyu-wallpaper')||'';return 'wallpaper.png';}
-function applyTheme(){document.body.dataset.theme=state.settings.theme;document.documentElement.style.setProperty('--card-alpha',state.settings.cardOpacity/100);const url=backgroundURL();$('#wallpaper').style.backgroundImage=url?'url("'+url.replace(/["\\\n\r]/g,'')+'")':'';}
+let appliedBackground='',customWallpaperURL='';
+function backgroundURL(){
+  if(state.settings.background==='none')return '';
+  if(state.settings.background==='custom'){
+    if(!N)return localStorage.getItem('xingyu-wallpaper')||'';
+    // 只在本次运行里生成一次带时间戳的地址；以前每次 render 都换地址，浏览器只能重新加载壁纸，
+    // 翻周时就会闪一下白。
+    if(!customWallpaperURL)customWallpaperURL='https://appassets.androidplatform.net/wallpaper?v='+Date.now();
+    return customWallpaperURL;
+  }
+  return 'wallpaper.png';
+}
+function applyTheme(){
+  document.body.dataset.theme=state.settings.theme;
+  document.documentElement.style.setProperty('--card-alpha',state.settings.cardOpacity/100);
+  const url=backgroundURL();
+  if(url===appliedBackground)return;
+  appliedBackground=url;
+  $('#wallpaper').style.backgroundImage=url?'url("'+url.replace(/["\\\n\r]/g,'')+'")':'';
+}
 function render(){stopWeekMotion();applyTheme();$('#today-button').hidden=tab!=='schedule';$('#content').dataset.tab=tab;if(tab!=='schedule')$('#week-feedback').classList.remove('visible');$('#navigation').innerHTML=[['schedule','calendar','课表'],['import','download','导入'],['theme','palette','装扮'],['settings','settings','设置']].map(([id,ico,label])=>'<button class="nav-item '+(tab===id?'active':'')+'" data-action="tab" data-tab="'+id+'" aria-current="'+(tab===id?'page':'false')+'"><span class="nav-icon">'+icon(ico)+'</span>'+label+'</button>').join('');$('#content').innerHTML=({schedule:renderSchedule,import:renderImport,theme:renderTheme,settings:renderSettings}[tab])();bindView();}
 function go(next){tab=next;render();$('#content').scrollTop=0;}
 function visibleCourses(){return sample?demo:T().courses;}
@@ -52,15 +70,47 @@ function animateWeekPages(stage,page,peer,direction,offset,committing,onDone){
   const motion={animations,cleanup};weekMotion=motion;
   Promise.allSettled(animations.map(a=>a.finished)).then(()=>{if(weekMotion!==motion)return;weekMotion=null;cleanup();animations.forEach(a=>a.cancel());if(onDone)onDone();});
 }
+// 相隔多周时按“每页一格”铺一条纸带滑过去，避免看起来只翻了一页。
+function playWeekJump(stage,from,to,onDone){
+  const distance=Math.abs(to-from),direction=to>from?1:-1;
+  if(distance<2||!stage||!stage.animate)return false;
+  const width=Math.max(1,stage.clientWidth),maxPages=12,weeks=[];
+  if(distance+1<=maxPages){for(let i=0;i<=distance;i++)weeks.push(from+direction*i);}
+  else{for(let i=maxPages-1;i>=0;i--)weeks.push(to-direction*i);}
+  const track=document.createElement('div');
+  track.className='week-track';
+  track.style.width=(weeks.length*width)+'px';
+  weeks.forEach((week,i)=>{
+    const el=document.createElement('div');
+    el.className='week-page week-track-page';
+    el.dataset.week=String(week);
+    el.setAttribute('aria-hidden','true');
+    el.inert=true;
+    el.innerHTML=renderTimetable(week);
+    el.style.position='absolute';el.style.top='0';el.style.left=(i*width)+'px';el.style.width=width+'px';
+    track.appendChild(el);
+  });
+  const staticPage=stage.querySelector('.week-page:not(.week-track-page)');
+  if(staticPage)staticPage.style.visibility='hidden';
+  stage.appendChild(track);
+  const end=-((weeks.length-1)*width);
+  const duration=Math.round(Math.min(920,240+120*Math.min(distance,8)));
+  const anim=track.animate([{transform:'translateX(0)'},{transform:'translateX('+end+'px)'}],{duration,easing:'cubic-bezier(.22,.7,.2,1)',fill:'forwards'});
+  const motion={animations:[anim],cleanup:()=>{track.remove();if(staticPage)staticPage.style.visibility='';}};
+  weekMotion=motion;
+  anim.finished.then(()=>{if(weekMotion!==motion)return;weekMotion=null;motion.cleanup();anim.cancel();if(onDone)onDone();}).catch(()=>{});
+  return true;
+}
 function navigateToWeek(next,{offset=0,focusToday=false}={}){
   next=Math.max(1,Math.min(T().totalWeeks,next));
   if(next===viewWeek){if(focusToday)focusTodayCourses();return false;}
   stopWeekMotion();
-  const direction=next>viewWeek?1:-1,oldPage=$('.week-stage>.week-page:not(.week-preview)'),scrollTop=$('#content').scrollTop;
+  const from=viewWeek,direction=next>viewWeek?1:-1,oldPage=$('.week-stage>.week-page:not(.week-preview)'),scrollTop=$('#content').scrollTop;
   viewWeek=next;render();$('#content').scrollTop=scrollTop;
-  const stage=$('.week-stage'),page=stage.querySelector('.week-page');
-  if(oldPage){oldPage.classList.add('week-outgoing');oldPage.setAttribute('aria-hidden','true');oldPage.inert=true;stage.appendChild(oldPage);}
+  const stage=$('.week-stage'),page=stage&&stage.querySelector('.week-page');
   showWeekFeedback(next,false,focusToday?'今天':'');
+  if(!reducedMotion()&&playWeekJump(stage,from,next,focusToday?focusTodayCourses:null))return true;
+  if(oldPage){oldPage.classList.add('week-outgoing');oldPage.setAttribute('aria-hidden','true');oldPage.inert=true;stage.appendChild(oldPage);}
   animateWeekPages(stage,page,oldPage,direction,offset,true,focusToday?focusTodayCourses:null);
   return true;
 }
@@ -223,7 +273,7 @@ function importError(message){if(tab==='import')$('#import-error').innerHTML='<d
 window.receiveSchoolSnapshot=text=>{try{window.__rawSnapshot=text;showImport(C.parseSchoolSnapshot(JSON.parse(text)));}catch(e){window.__rawSnapshot=text;go('import');importError(e.message);}};
 function snapshotFromHTML(html){const doc=new DOMParser().parseFromString(html,'text/html');return {tables:Array.from(doc.querySelectorAll('table')).map(table=>({rows:Array.from(table.rows).map(row=>({cells:Array.from(row.cells).map(cell=>C.cellSnapshot(doc,cell))}))}))};}
 window.receiveImportFile=text=>{try{text=text.replace(/^\uFEFF/,'').trim();if(text.length>2*1024*1024)throw new Error('文件过大，请选择小于 2 MB 的课表文件');if(text.startsWith('{')||text.startsWith('[')){const data=JSON.parse(text);if(Array.isArray(data))showImport({courses:data});else if(Array.isArray(data.timetables)){const checked=C.sanitizeState(data);showImport({timetables:checked.timetables,settings:checked.settings,activeId:checked.activeId});}else if(Array.isArray(data.courses)){const checked=C.sanitizeState(data),first=checked.timetables[0];showImport({courses:first.courses,settings:data.settings?{...checked.settings,...pickSemester(first)}:null});}else throw new Error('不是星屿课表 JSON 格式，请使用 CSV、课表 HTML 或在教务页面识别');}else if(text.startsWith('<'))showImport(C.parseSchoolSnapshot(snapshotFromHTML(text)));else showImport({courses:C.parseCSV(text)});}catch(e){importError(e.message);}};
-window.receiveBackground=()=>{if(updateSettings({background:'custom'})){render();toast('背景已更换，只保存在本机');}};
+window.receiveBackground=()=>{customWallpaperURL='';appliedBackground='';if(updateSettings({background:'custom'})){render();toast('背景已更换，只保存在本机');}};
 window.handleNativeBack=()=>{if($('#sheet').open){closeSheet();return true;}if(tab!=='schedule'){go('schedule');return true;}if(sample){sample=false;render();return true;}return false;};
 const actions={
   tab:b=>go(b.dataset.tab),add:()=>courseForm(),edit:b=>courseForm(b.dataset.id),close:closeSheet,detail:b=>detail(b.dataset.id),semester:semesterForm,today:jumpToToday,'switch-timetable':timetableSheet,timetable:timetableSheet,'select-timetable':b=>switchTimetable(b.dataset.id),'new-timetable':newTimetableForm,'rename-timetable':b=>renameTimetableForm(b.dataset.id),'delete-timetable':b=>deleteTimetable(b.dataset.id),

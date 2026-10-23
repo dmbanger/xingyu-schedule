@@ -55,6 +55,10 @@ body[data-theme=night] .timetable-item{background:rgba(43,40,67,.55)}
 /* 识别失败时的提示保留换行，便于核对单元格原文 */
 .notice.warning{white-space:pre-wrap}
 
+/* 跨多周跳转：一次铺出多页课表连续滑过 */
+.week-track{position:absolute;top:0;left:0;z-index:3;will-change:transform}
+.week-track-page{position:absolute;top:0;pointer-events:none}
+
 /* 日期栏吸附：向上滚动后，星期/日期表头固定在该区域顶部，滚动到课表末尾时自然收起 */
 #content[data-tab=schedule]{padding-top:0}
 #content[data-tab=schedule] .week-toolbar{margin-top:12px}
