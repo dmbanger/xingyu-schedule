@@ -13,14 +13,14 @@ dialog{padding:0;width:calc(100% - 22px);max-width:490px;border:1px solid #fff8;
 .app-header>.icon-button{height:32px;min-width:32px;border-radius:10px;font-size:23px}
 .week-toolbar{margin:4px 0 12px}.month-label{font-size:21px}.month-label small{margin-top:3px}
 .next-class{padding:10px 12px;margin-bottom:12px}.next-class>.next-icon{width:28px;height:28px;border-radius:9px}
-.timetable{touch-action:pan-y pinch-zoom}.course-card{user-select:none;-webkit-user-select:none}
+.timetable{touch-action:pan-y}.course-card{user-select:none;-webkit-user-select:none}
 @media(min-width:700px){.app-header{padding:6px 35px}}
 @media(max-width:400px){.app-header{padding:6px 12px}}
 
 /* Adjacent timetable pages track the finger and settle into place.
    overflow:visible + clip-path clips the sliding pages without creating a scroll container,
    so the day header below can stay sticky against #content. */
-.week-stage{position:relative;overflow:visible;clip-path:inset(0 round 17px);isolation:isolate;border-radius:17px;touch-action:pan-y pinch-zoom}
+.week-stage{position:relative;overflow:visible;clip-path:inset(0 round 17px);isolation:isolate;border-radius:17px;touch-action:pan-y}
 .week-page{position:relative;width:100%;min-width:0;transform:translateX(0)}
 .week-preview,.week-outgoing{position:absolute;top:0;left:0;width:100%;pointer-events:none;will-change:transform}
 .week-outgoing{z-index:2}.week-preview{z-index:1}.week-moving{will-change:transform}

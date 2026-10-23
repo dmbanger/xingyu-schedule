@@ -2,6 +2,8 @@
 
 日期：2026-10-22。
 
+0.3.13 验证（固定界面缩放）：先在移动模拟环境里复现：用 CDP 双指张开手势，`visualViewport.scale` 从 1 变成 2.28，确认页面确实允许缩放。修复三处：`index.html` 的 viewport 增加 `maximum-scale=1, minimum-scale=1, user-scalable=no`；`.timetable` 与 `.week-stage` 的 `touch-action` 由 `pan-y pinch-zoom` 改为 `pan-y`；`MainActivity` 里本地 WebView 关闭 `setSupportZoom` / `setBuiltInZoomControls` / `setDisplayZoomControls`，`setTextZoom(100)`，并关闭宽视口与概览模式。复测同一手势后 `scale` 保持 1。`swipe-smoke`（判切周与滚动仍正常，说明 `pan-y` 没影响手势）、`ui-smoke` 16 个流程、`motion-smoke` 通过。真机（Android 测试设备，versionCode 21）：在课表空白处连点两下，前后两张截图字节完全一致（无缩放、无位移）。教务浏览器窗口的缩放能力保留。
+
 0.3.12 验证（装扮页文案）：`renderTheme()` 里的背景面板改为标题「自定义背景」、徽标「自选图片」、说明「可从手机中选择喜欢的图片，图片仅在本地保存。」。用脚本核对旧的字样（二次元背景、奶龙壁纸 / 自选图片、默认使用“神圣奶龙奔跑”壁纸）在 `app.js` 中已不存在，新文案均已存在；`ui-smoke` 16 个流程与 `motion-smoke` 通过；真机（Android 测试设备，versionCode 20）装扮页显示为「自定义背景 / 自选图片 / 可从手机中选择喜欢的图片，图片仅在本地保存。」。
 
 0.3.11 验证：**① 高亮同步**：日期栏（`today-highlight`）与整列（`today-column-flash`）原来分别是 1s/1.6s、40%/42% 的节奏，现在都用 `var(--today-flash,1.6s)` 与 `0%,42%` 停点，浏览器读出的 `animation-duration` 两处均为 `1.6s`。**② 沉浸阅读**：新增 `body.immersive` 状态，`.app-header` 与 `#navigation` 用 `max-height` + padding/border/opacity 过渡收起（`#content` 是 flex:1，所以课表区域随之变高），“今”按钮同时下移。触发条件是课表页上点空白处：点击目标不在 `[data-action], button, a, input, select, textarea, label, summary` 里、不在滑动后的抑制窗口内、且弹层未打开。浏览器实测：收起后 header 44→0、nav 68→0、内容 730→852，再点恢复原值；点课程卡片只打开详情、不改沉浸状态；离开课表页自动恢复；返回键优先恢复。`ui-smoke` 16 个流程、`swipe-smoke`、`motion-smoke` 全部通过。真机（Android 测试设备，versionCode 19）：点空白后顶部品牌栏与底部导航收起、课表占满整屏（截图），再点一次恢复。
