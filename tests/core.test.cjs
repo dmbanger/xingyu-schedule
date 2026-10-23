@@ -106,6 +106,67 @@ test('正方课表：课程名 / 教师 / 周次 / 节次 / 地点 分行的单�
   assert.deepEqual(c.weeks,[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]);
   assert.deepEqual(out.warnings,[]);
 });
+test('北邮强智课表（模拟导出）：同一门课的摘要和明细不能拆成两条',()=>{
+  const single=[
+    '示例理论课',
+    '【周次】3-18(周)',
+    '【地点】示例楼101',
+    '示例理论课',
+    '【教师】示例教师甲',
+    '【周次】3-18(周)[01-02节]',
+    '【地点】示例楼101'
+  ].join('\n');
+  const withClass=[
+    '示例图形课',
+    '(B班)',
+    '【周次】3-18(周)',
+    '【地点】示例楼202室',
+    '示例图形课',
+    '(B班)',
+    '【教师】示例教师乙',
+    '【周次】3-18(周)[01-02节]',
+    '【地点】示例楼202室'
+  ].join('\n');
+  const rows=[header,
+    row(cell('1'),cell(single),cell(withClass),cell(''),cell(''),cell(''),cell(''),cell(''))];
+  const out=C.parseSchoolSnapshot({tables:[{rows}]});
+  assert.deepEqual(out.warnings,[]);
+  assert.equal(out.courses.length,2);
+  const [prob,graphics]=out.courses;
+  assert.deepEqual([prob.name,prob.teacher,prob.room,prob.day,prob.start,prob.end],['示例理论课','示例教师甲','示例楼101',1,1,2]);
+  assert.deepEqual(prob.weeks,[3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18]);
+  assert.deepEqual([graphics.name,graphics.teacher,graphics.room],['示例图形课','示例教师乙','示例楼202室']);
+});
+test('北邮强智课表：一格两段不同周次/教室要拆开，备注行不算课表',()=>{
+  const twoLectures=[
+    '示例课程 P',
+    '【周次】7(周)',
+    '【地点】示例楼203',
+    '----------------------',
+    '示例课程 P',
+    '【周次】9,11,13(周)',
+    '【地点】示例楼204',
+    '示例课程 P',
+    '【教师】示例教师丙,示例教师丁',
+    '【周次】7(周)[01-02节]',
+    '【地点】示例楼203',
+    '---------------------',
+    '示例课程 P',
+    '【教师】示例教师丙,示例教师丁',
+    '【周次】9,11,13(周)[02-03节]',
+    '【地点】示例楼204'
+  ].join('\n');
+  const rows=[header,
+    row(cell('1'),cell(twoLectures),cell(''),cell(''),cell(''),cell(''),cell(''),cell('')),
+    row(cell('备注:'),cell('示例在线课程 示例临班 3-18周',{colSpan:7}))];
+  const out=C.parseSchoolSnapshot({tables:[{rows}]});
+  assert.deepEqual(out.warnings,[]);
+  assert.equal(out.courses.length,2);
+  const [first,second]=out.courses;
+  assert.deepEqual([first.name,first.start,first.end,first.weeks,first.room],[ '示例课程 P',1,2,[7],'示例楼203']);
+  assert.deepEqual([second.start,second.end,second.weeks,second.room],[2,3,[9,11,13],'示例楼204']);
+  assert.equal(second.teacher,'示例教师丙,示例教师丁');
+});
 test('北化正方课表（模拟导出格式）：整格文字粘连成一行也能拆出课程',()=>{
   // 下面三段使用虚构课程、教师和地点，仅保留导出结构与解析边界
   const cellA='示例程序设计★(1-2节)1-9周,11-13周【地点】示例楼A-101【教师】示例教师示例程序设计-0005示例甲2501;示例甲2502;示例甲2503;示例甲2504;示例乙C2501;示例乙C2502;示例丙2501;示例丙2502;示例丁2501;示例丁2502考查讲课:24,上机:163242.0';

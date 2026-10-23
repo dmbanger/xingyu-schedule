@@ -189,12 +189,30 @@
     }
     return periods.map(([start,end])=>validateCourse({name,teacher,room,day,start,end,weeks:parsedWeeks,color:['lavender','mint','sky','rose','peach','lemon'][index%6]}));
   }
+  // 强智（北邮）的单元格会把同一门课画两遍：先是“课程名 / 周次 / 地点”摘要，再是带
+  // [xx节] 的明细，两段之间没有分隔符。按“明细行 + 紧随的地点行”切块，每块正好一门课。
+  function splitByDetailLines(text){
+    if(!/【地点】/.test(text))return null;
+    const LF=String.fromCharCode(10),lines=text.split(LF),marks=[];
+    lines.forEach((s,i)=>{if(/周/.test(s)&&/\[[^\]]*节/.test(s))marks.push(i);});
+    if(marks.length<2)return null;
+    const blocks=[];let start=0;
+    for(const at of marks){
+      let end=at;
+      for(let j=at+1;j<lines.length;j++){if(/【地点】/.test(lines[j])){end=j;break;}}
+      blocks.push(lines.slice(start,end+1).join(LF));
+      start=end+1;
+    }
+    return blocks.length>1?blocks:null;
+  }
   // A cell can stack several courses: 强智 uses a horizontal rule, 正方 repeats a 周次 line per
   // course. Splitting only happens when every piece looks complete, so one course with stray
   // blank lines is never torn apart.
   function courseBlocks(cell){
     const LF=String.fromCharCode(10),text=String(cell&&cell.text||'');
     const complete=s=>/[0-9]/.test(s)&&/周/.test(s);
+    const detailed=splitByDetailLines(text);
+    if(detailed)return detailed;
     let blocks=Array.isArray(cell.blocks)&&cell.blocks.length>1?cell.blocks:null;
     if(!blocks){
       blocks=[];let current=[];
@@ -214,6 +232,9 @@
     const lines=text.split(LF).filter(s=>s.trim());
     const weekAt=lines.map((s,i)=>/[0-9]/.test(s)&&/周/.test(s)&&!/星期/.test(s)?i:-1).filter(i=>i>=0);
     if(weekAt.length>1){
+      // 同一门课的摘要和明细都会带周次，课程名重复出现时不要拆开。
+      const firstLine=lines.find(Boolean)||'';
+      if(firstLine&&lines.filter(l=>l===firstLine).length>1)return [text];
       const meta=s=>/^(考察|考查|考试|考核)/.test(s)||/^[\d.]+$/.test(s)||/(区|楼|阶|教室|馆|场|中心|未排)/.test(s)||/^[\u4e00-\u9fa5·]{2,6}$/.test(s)||/[-_][0-9]{2,}$/.test(s);
       const parts=[];let start=0;
       for(let k=0;k<weekAt.length-1;k++){
@@ -283,6 +304,9 @@
       const firstDayCol=Math.min(...Object.keys(dayCols).map(Number));
       const rowPeriods=grid.map(cells=>{for(let col=firstDayCol-1;col>=0;col--){try{const ranges=parsePeriodRanges(cells[col]?.text);if(ranges)return ranges;}catch(_){return null;}}return null;});
       for(let r=header+1;r<rows.length;r++){
+        // 末尾的“备注”行罗列的是在线课程等附加信息，不是课表格子，跳过以免误报。
+        const lead=(orig[r]||[])[0];
+        if(lead&&/^备注/.test(String(lead.cell&&lead.cell.text||'').trim()))continue;
         for(const {cell,col,rowSpan,colSpan} of orig[r]||[]){const day=dayCols[col];if(!day)continue;const blocks=courseBlocks(cell);
           const spannedRows=rowPeriods.slice(r,r+rowSpan);let fallback=null;
           if(spannedRows.length===rowSpan&&spannedRows.every(Boolean))fallback=periodRanges(spannedRows.flatMap(ranges=>ranges.flatMap(([a,b])=>Array.from({length:b-a+1},(_,i)=>a+i))));
