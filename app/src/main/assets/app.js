@@ -177,12 +177,14 @@ function paintWeekDrag(g,dx){
 }
 function focusTodayCourses(){
   if(tab!=='schedule')return;
-  const now=new Date(),day=(now.getDay()+6)%7+1,courses=T().courses.filter(c=>c.day===day&&c.weeks.includes(viewWeek)).sort((a,b)=>a.start-b.start);
-  const minutes=now.getHours()*60+now.getMinutes();
-  const next=courses.find(c=>{const end=T().times[c.end-1]?.slice(6);return end&&(+end.slice(0,2)*60+ +end.slice(3))>=minutes;})||courses[0];
-  const target=next?Array.from(document.querySelectorAll('.week-stage>.week-page:not(.week-outgoing) .course-card')).find(n=>n.dataset.ids.split(',').includes(next.id)):$('.day.today');
-  const content=$('#content'),top=target?content.scrollTop+target.getBoundingClientRect().top-content.getBoundingClientRect().top-46:0;
-  content.scrollTo({top:Math.max(0,top),behavior:reducedMotion()?'auto':'smooth'});
+  const now=new Date();
+  // 回到今天时停在课表最上方：日期栏对齐滚动区顶部，第 1 节紧接其下，
+  // 不再滚到“当前正在上的课”所在的中间位置。
+  const content=$('#content'),stage=$('.week-stage');
+  if(stage){
+    const top=content.scrollTop+stage.getBoundingClientRect().top-content.getBoundingClientRect().top;
+    content.scrollTo({top:Math.max(0,Math.round(top)),behavior:reducedMotion()?'auto':'smooth'});
+  }
   const header=$('.day.today');if(header){header.classList.remove('today-focus');void header.offsetWidth;header.classList.add('today-focus');}
   showWeekFeedback(viewWeek,false,'今天 '+(now.getMonth()+1)+'月'+now.getDate()+'日');
 }
