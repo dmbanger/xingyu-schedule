@@ -106,6 +106,45 @@ test('正方课表：课程名 / 教师 / 周次 / 节次 / 地点 分行的单�
   assert.deepEqual(c.weeks,[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]);
   assert.deepEqual(out.warnings,[]);
 });
+test('北化正方课表：图标前缀 + 每门课自带周次行 + 无空行分隔',()=>{
+  const buctCell=[
+    '示例实验课程 B (I) ○',
+    '⊙ (1-4节)11-18周',
+    '📍 示例校区 未排地点',
+    '👤 示例教师戊',
+    '🏫 示例实验课程 B (I) -0060',
+    '🏛 示例丁2502',
+    '⚙ 考察',
+    '⚙',
+    '⚙ 实验:32',
+    '⚙ 3',
+    '⚙ 32',
+    '⚙ 1.0',
+    '示例数学A★',
+    '⊙ (3-4节)1-5周,7-8周',
+    '📍 示例楼 A-101',
+    '👤 示例教师辛',
+    '🏫 示例数学A -0061',
+    '🏛 示例丁2502',
+    '⚙ 考察',
+    '⚙ 1.5'
+  ].join('\n');
+  const rows=[header,row(cell('第1节'),cell(buctCell),...Array.from({length:6},()=>cell()))];
+  const out=C.parseSchoolSnapshot({tables:[{rows}]});
+  assert.equal(out.courses.length,2,'一格两门课应拆成两条安排');
+  const chem=out.courses[0],lin=out.courses[1];
+  assert.equal(chem.name,'示例实验课程 B (I)');
+  assert.deepEqual([chem.day,chem.start,chem.end],[1,1,4]);
+  assert.deepEqual(chem.weeks,[11,12,13,14,15,16,17,18]);
+  assert.equal(chem.teacher,'示例教师戊');
+  assert.equal(chem.room,'示例校区 未排地点');
+  assert.equal(lin.name,'示例数学A');
+  assert.deepEqual([lin.start,lin.end],[3,4]);
+  assert.deepEqual(lin.weeks,[1,2,3,4,5,7,8]);
+  assert.equal(lin.teacher,'示例教师辛');
+  assert.equal(lin.room,'示例楼 A-101');
+  assert.deepEqual(out.warnings,[]);
+});
 test('正方课表：一个格子用空行分隔两门课、单周写法与空格标签',()=>{
   const twoCourses=cell('大学英语\n李四\n1-8周\n3-4节\n教201\n\n数据结构\n王五\n1-16周(单)\n5-6节\n地点 实验楼301');
   const rows=[header,row(cell('第3节'),twoCourses,...Array.from({length:6},()=>cell()))];

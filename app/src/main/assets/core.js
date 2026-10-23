@@ -156,9 +156,15 @@
     return periodRanges(values);
   }
   function parsePeriods(text){const ranges=parsePeriodRanges(text);if(!ranges)return null;if(ranges.length!==1)throw new Error('节次不连续，请分段录入');return ranges[0];}
+  // 正方 draws a small icon before most fields; icon-font glyphs survive in textContent,
+  // so trim anything that is not a letter, digit or bracket from both ends of a line.
+  function stripMarks(value){
+    return String(value||'').replace(/^[^0-9A-Za-z\u4e00-\u9fa5\u3040-\u30ff【（(\[]+/,'').replace(/[^0-9A-Za-z\u4e00-\u9fa5\u3040-\u30ff\]】)）]+$/,'').trim();
+  }
   function parseBlock(block,day,fallbackPeriods,index){
     const text=String(block||'').trim();if(!text||/^(无|暂无|空|[-—\s]+)$/.test(text))return null;
-    const lines=text.split(/\n+/).map(s=>s.trim()).filter(Boolean);
+    const lines=text.split(/\n+/).map(stripMarks).filter(Boolean);
+    if(!lines.length)return null;
     const weekLine=lines.find(s=>/\d.*周|周次.*\d/.test(s)&&!/星期/.test(s));
     if(!weekLine)throw new Error('无法识别周次：'+lines[0]);
     const withoutPeriods=weekLine.replace(/[\[【(（][^\]】)）]*节[^\]】)）]*[\]】)）]/g,'').replace(/\d{1,2}\s*[-,，、至~～]\s*\d{1,2}\s*节/g,'');
@@ -168,19 +174,27 @@
     const periods=parsePeriodRanges(lines.filter(x=>/节/.test(x)).join(' '))||fallbackPeriods;
     if(!periods)throw new Error('无法识别节次：'+lines[0]);
     const labeled=(kind)=>{const re=new RegExp('^(?:【)?(?:'+kind+')(?:】|[:：]|[ \u3000])');const l=lines.find(s=>re.test(s));return l?l.replace(re,'').trim():'';};
-    const name=labeled('课程|课程名称')||lines.find(s=>!s.startsWith('【')&&!/^(教师|老师|教室|地点|周次|课程编号|学分|考查|考试)[:： 　]/.test(s)&&!/\d.*周|第?\d+.*节/.test(s));
-    if(!name)throw new Error('无法识别课程名');
-    const unlabeled=lines.filter(s=>s!==name&&s!==weekLine&&!s.startsWith('【')&&!/^(教师|老师|教室|地点|周次|课程编号|学分)[:： 　]/.test(s)&&!/^第?\d.*节/.test(s));
-    let teacher=labeled('教师|老师'),room=labeled('教室|地点|上课地点');const rest=unlabeled.slice();
-    if(!teacher&&rest.length)teacher=rest.shift();
-    if(!room&&rest.length)room=rest.pop();
+    // 正方 repeats 考核方式 / 学时 / 学分 / 班级 / 课程编号 around the name; keep them out of it.
+    const noise=s=>/^(考察|考查|考试|考核|必修|选修|限选|任选)/.test(s)||/^[\d.]+$/.test(s)||/^[\d.]+\s*(学时|学分|人)$/.test(s)||/^(?:课程编号|班级|考核方式)[:： \u3000]/.test(s);
+    const titleLike=s=>!s.startsWith('【')&&!noise(s)&&!/^(教师|老师|教室|地点|周次|课程编号|学分|考查|考试)[:： \u3000]/.test(s)&&!/\d.*周|第?\d+.*节/.test(s);
+    const name=labeled('课程|课程名称')||lines.find(titleLike);
+    if(!name)throw new Error('无法识别课程名：'+lines.slice(0,2).join(' / '));
+    let teacher=labeled('教师|老师'),room=labeled('教室|地点|上课地点');
+    if(!room){const candidate=lines.find(s=>s!==name&&s!==weekLine&&/(区|楼|阶|教室|室|馆|场|中心|未排)/.test(s)&&!/\d.*周/.test(s));if(candidate)room=candidate;}
+    if(!teacher){const from=room?lines.indexOf(room)+1:0;for(let i=from;i<lines.length;i++){if(lines[i]!==name&&/^[\u4e00-\u9fa5·]{2,6}$/.test(lines[i])){teacher=lines[i];break;}}}
+    if(!teacher||!room){
+      const rest=lines.filter(s=>s!==name&&s!==weekLine&&s!==teacher&&s!==room&&!s.startsWith('【')&&!noise(s)&&!/^(教师|老师|教室|地点|周次|课程编号|学分)[:： \u3000]/.test(s)&&!/^第?\d.*节/.test(s));
+      if(!teacher&&rest.length)teacher=rest.shift();
+      if(!room&&rest.length)room=rest.pop();
+    }
     return periods.map(([start,end])=>validateCourse({name,teacher,room,day,start,end,weeks:parsedWeeks,color:['lavender','mint','sky','rose','peach','lemon'][index%6]}));
   }
-  // A cell can stack several courses: 强智 separates them with a horizontal rule, 正方 with a
-  // blank line. A single course may contain blank lines too, so blank-line groups only count
-  // when every group carries week information.
+  // A cell can stack several courses: 强智 uses a horizontal rule, 正方 repeats a 周次 line per
+  // course. Splitting only happens when every piece looks complete, so one course with stray
+  // blank lines is never torn apart.
   function courseBlocks(cell){
     const LF=String.fromCharCode(10),text=String(cell&&cell.text||'');
+    const complete=s=>/[0-9]/.test(s)&&/周/.test(s);
     let blocks=Array.isArray(cell.blocks)&&cell.blocks.length>1?cell.blocks:null;
     if(!blocks){
       blocks=[];let current=[];
@@ -195,7 +209,25 @@
     const groups=[];let group=[];
     for(const line of text.split(LF)){if(!line.trim()){if(group.length){groups.push(group.join(LF));group=[];}continue;}group.push(line);}
     if(group.length)groups.push(group.join(LF));
-    return groups.length>1&&groups.every(s=>/[0-9]/.test(s)&&/周/.test(s))?groups:[text];
+    if(groups.length>1&&groups.every(complete))return groups;
+    // 正方: no blank line between courses, but every course carries its own 周次 line.
+    const lines=text.split(LF).filter(s=>s.trim());
+    const weekAt=lines.map((s,i)=>/[0-9]/.test(s)&&/周/.test(s)&&!/星期/.test(s)?i:-1).filter(i=>i>=0);
+    if(weekAt.length>1){
+      const meta=s=>/^(考察|考查|考试|考核)/.test(s)||/^[\d.]+$/.test(s)||/(区|楼|阶|教室|馆|场|中心|未排)/.test(s)||/^[\u4e00-\u9fa5·]{2,6}$/.test(s)||/[-_][0-9]{2,}$/.test(s);
+      const parts=[];let start=0;
+      for(let k=0;k<weekAt.length-1;k++){
+        let cut=weekAt[k+1];
+        for(let j=cut-1;j>weekAt[k];j--){
+          if(meta(stripMarks(lines[j])))break;
+          cut=j;
+        }
+        parts.push(lines.slice(start,cut).join(LF));start=cut;
+      }
+      parts.push(lines.slice(start).join(LF));
+      if(parts.length>1&&parts.every(complete))return parts;
+    }
+    return [text];
   }
   function parseSchoolSnapshot(snapshot){
     if(!snapshot||!Array.isArray(snapshot.tables))throw new Error('未找到课表表格，请进入个人课表页面再识别');
@@ -224,15 +256,39 @@
   function conflicts(courses){const result=[];for(let i=0;i<courses.length;i++)for(let j=i+1;j<courses.length;j++){const a=courses[i],b=courses[j];if(a.day===b.day&&a.start<=b.end&&b.start<=a.end&&a.weeks.some(w=>b.weeks.includes(w)))result.push(a.name+' / '+b.name+'（周'+a.day+'）');}return result;}
   // Reads one table cell into text with one field per line. The injected page extractor
   // serialises this function, so it must stay dependency-free and backslash-free.
+  // Reads one table cell into text with one field per line. It walks the live cell and asks
+  // the layout (getComputedStyle) which elements start a new line, because 正方 puts every
+  // field in a <span style="display:block"> with no <br> at all. The injected page extractor
+  // serialises this function, so it must stay dependency-free.
   function cellSnapshot(doc,cell){
     const LF=String.fromCharCode(10);
-    const clone=cell.cloneNode(true);
-    clone.querySelectorAll('input,textarea,select,button,script,style,form').forEach(n=>n.remove());
-    clone.querySelectorAll('br').forEach(n=>n.replaceWith(doc.createTextNode(LF)));
-    clone.querySelectorAll('hr').forEach(n=>n.replaceWith(doc.createTextNode(LF+'---'+LF)));
-    clone.querySelectorAll('div,p,li,dt,dd,section,article,header,footer').forEach(n=>{if((n.textContent||'').slice(-1)!==LF)n.appendChild(doc.createTextNode(LF));});
-    clone.querySelectorAll('[title]').forEach(n=>{const t=n.getAttribute('title')||'';const tag=/教师|老师/.test(t)?'【教师】':/教室|地点/.test(t)?'【地点】':/周次|周数/.test(t)?'【周次】':'';if(!tag)return;const prev=n.previousSibling;if(!prev||!(prev.textContent||'').endsWith(LF))n.prepend(doc.createTextNode(LF));n.prepend(doc.createTextNode(tag));});
-    return {text:(clone.textContent||'').trim(),rowSpan:cell.rowSpan,colSpan:cell.colSpan};
+    const skip=/^(SCRIPT|STYLE|INPUT|TEXTAREA|SELECT|BUTTON|FORM|IMG|SVG|CANVAS)$/;
+    const blockTags=/^(DIV|P|LI|DT|DD|SECTION|ARTICLE|HEADER|FOOTER|TR|TD|TH|TABLE|FORM|H1|H2|H3|H4|H5|H6)$/;
+    const view=doc.defaultView||doc.parentWindow;
+    let out='';
+    const brk=()=>{if(out.slice(-1)!==LF)out+=LF;};
+    const walk=node=>{
+      if(node.nodeType===3){out+=node.nodeValue;return;}
+      if(node.nodeType!==1)return;
+      const tag=node.tagName||'';
+      if(skip.test(tag))return;
+      if(tag==='BR'){out+=LF;return;}
+      if(tag==='HR'){out+=LF+'---'+LF;return;}
+      const title=(node.getAttribute&&node.getAttribute('title'))||'';
+      let mark='';
+      if(/教师|老师/.test(title))mark='【教师】';
+      else if(/教室|地点/.test(title))mark='【地点】';
+      else if(/周次|周数/.test(title))mark='【周次】';
+      if(mark){brk();out+=mark;}
+      let block=blockTags.test(tag);
+      if(!block){try{block=/^(BLOCK|FLEX|GRID|LIST-ITEM|FLOW-ROOT|TABLE|TABLE-ROW|TABLE-CELL|TABLE-CAPTION)$/.test(String(view.getComputedStyle(node).display).toUpperCase());}catch(e){}}
+      if(block)brk();
+      for(let child=node.firstChild;child;child=child.nextSibling)walk(child);
+      if(block)brk();
+    };
+    for(let child=cell.firstChild;child;child=child.nextSibling)walk(child);
+    const text=out.split(LF).map(s=>s.replace(/[\t\u00a0\u3000 ]+/g,' ').trim()).filter((s,i,arr)=>s!==''||(i>0&&arr[i-1]!=='')).join(LF).trim();
+    return {text,rowSpan:cell.rowSpan,colSpan:cell.colSpan};
   }
   function snapshotScript(){return `(function(){var out={sourceHost:location.hostname,tables:[]};var capture=${cellSnapshot.toString()};function scan(doc){Array.from(doc.querySelectorAll("table")).forEach(function(table){if(table.rows.length>80)return;out.tables.push({rows:Array.from(table.rows).map(function(row){return {cells:Array.from(row.cells).map(function(cell){return capture(doc,cell);})};})});});Array.from(doc.querySelectorAll("iframe,frame")).forEach(function(f){try{if(f.contentDocument)scan(f.contentDocument);}catch(e){}});}scan(document);return JSON.stringify(out);})()`;}
   return {uid,parseWeeks,weekLabel,validateCourse,normalizeCourses,monday,dateString,parseDate,weekAt,defaultState,sanitizeState,validTimeRange,parseCSV,parsePeriods,parsePeriodRanges,parseSchoolSnapshot,conflicts,snapshotScript,cellSnapshot,SCHOOL_PRESETS,schoolPreset,semesterName,sanitizeTimetable,defaultTimetable};

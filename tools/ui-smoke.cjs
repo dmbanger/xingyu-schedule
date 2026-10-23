@@ -103,6 +103,15 @@ const {pathToFileURL}=require('node:url');
   const school=await context.newPage();await school.setContent('<form><input value="private-password"></form><table><tr><td>星期一</td></tr><tr><td>课程甲<br><span title="教师">王老师</span><br>1-16周[01-02节]<br><span title="教室">教三201</span></td></tr></table>');
   const script=require('../app/src/main/assets/core.js').snapshotScript();
   const captured=await school.evaluate(script);assert.ok(!captured.includes('private-password'));assert.ok(captured.includes('【教师】'));assert.ok(captured.includes('教三201'));
+  // 正方把每个字段放进 display:block 的 span 且没有 <br>：抽取时必须按渲染换行，不能粘连。
+  const buctPage=await context.newPage();
+  await buctPage.setContent('<style>.b{display:block}</style><table><tr><td>节次</td><td>星期一</td><td>星期二</td><td>星期三</td><td>星期四</td><td>星期五</td><td>星期六</td><td>星期日</td></tr><tr><td>第1节</td><td><span class="b">示例实验课程 B (I)</span><span class="b">◉(1-4节)11-18周</span><span class="b">📍示例校区 未排地点</span><span class="b">👤示例教师戊</span></td><td></td><td></td><td></td><td></td><td></td><td></td></tr></table>');
+  const buctCaptured=JSON.parse(await buctPage.evaluate(script));
+  const buctCellText=buctCaptured.tables[0].rows[1].cells[1].text;
+  assert.ok(buctCellText.split('\n').filter(Boolean).length>=4,'display:block 的字段应各占一行');
+  const buctParsed=require('../app/src/main/assets/core.js').parseSchoolSnapshot(buctCaptured);
+  assert.equal(buctParsed.courses.length,1);
+  assert.deepEqual([buctParsed.courses[0].name,buctParsed.courses[0].teacher,buctParsed.courses[0].room],[ '示例实验课程 B (I)','示例教师戊','示例校区 未排地点']);
   // File-derived text is displayed as text, including characters that resemble HTML.
   await page.locator('[data-tab="import"]').click();
   await page.evaluate(()=>window.receiveImportFile(JSON.stringify({courses:[{name:'<img src=x onerror=alert(1)>',day:1,start:1,end:2,weeks:'1-16'}]})));
