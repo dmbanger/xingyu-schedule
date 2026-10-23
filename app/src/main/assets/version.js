@@ -1,1 +1,1 @@
-window.AppVersion="0.3.6";window.AppVersionCode="14";
+window.AppVersion="0.3.7";window.AppVersionCode="15";

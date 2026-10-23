@@ -20,7 +20,7 @@ const demo=C.normalizeCourses([
 {name:'体育',teacher:'示例教师',room:'体育馆',day:3,start:8,end:9,weeks:'1-20',color:'lemon'},
 {name:'计算机实验',teacher:'示例教师',room:'实验楼 302',day:4,start:6,end:8,weeks:'1-20',color:'lavender'}]);
 function toast(message){$('#toast').textContent=message;$('#toast').classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').classList.remove('visible'),3600);}
-function persist(next){try{next=C.sanitizeState(next);const text=JSON.stringify(next);if(N){if(!N.saveState(text))throw new Error('保存失败，请检查手机剩余空间');}else localStorage.setItem('xingyu-state',text);state=next;applyTheme();return true;}catch(e){toast(e.message||'未能保存');return false;}}
+function persist(next){try{next=C.sanitizeState(next);const text=JSON.stringify(next);if(N){if(!N.saveState(text))throw new Error('保存失败，请检查手机剩余空间');}else localStorage.setItem('xingyu-state',text);state=next;neighbourCache={week:0,prev:null,next:null};applyTheme();return true;}catch(e){toast(e.message||'未能保存');return false;}}
 function updateSettings(patch){return persist({...state,settings:{...state.settings,...patch}});}
 function getBackup(){try{return N?N.getImportBackup():localStorage.getItem('xingyu-before-import')||'';}catch(_){return '';}}
 function saveImportBackup(){const text=JSON.stringify(state);if(N)return N.backupBeforeImport(text);localStorage.setItem('xingyu-before-import',text);return true;}
@@ -48,7 +48,7 @@ function applyTheme(){
   appliedBackground=url;
   $('#wallpaper').style.backgroundImage=url?'url("'+url.replace(/["\\\n\r]/g,'')+'")':'';
 }
-function render(){stopWeekMotion();applyTheme();$('#today-button').hidden=tab!=='schedule';$('#content').dataset.tab=tab;if(tab!=='schedule')$('#week-feedback').classList.remove('visible');$('#navigation').innerHTML=[['schedule','calendar','课表'],['import','download','导入'],['theme','palette','装扮'],['settings','settings','设置']].map(([id,ico,label])=>'<button class="nav-item '+(tab===id?'active':'')+'" data-action="tab" data-tab="'+id+'" aria-current="'+(tab===id?'page':'false')+'"><span class="nav-icon">'+icon(ico)+'</span>'+label+'</button>').join('');$('#content').innerHTML=({schedule:renderSchedule,import:renderImport,theme:renderTheme,settings:renderSettings}[tab])();bindView();}
+function render(){stopWeekMotion();applyTheme();$('#today-button').hidden=tab!=='schedule';$('#content').dataset.tab=tab;if(tab!=='schedule')$('#week-feedback').classList.remove('visible');$('#navigation').innerHTML=[['schedule','calendar','课表'],['import','download','导入'],['theme','palette','装扮'],['settings','settings','设置']].map(([id,ico,label])=>'<button class="nav-item '+(tab===id?'active':'')+'" data-action="tab" data-tab="'+id+'" aria-current="'+(tab===id?'page':'false')+'"><span class="nav-icon">'+icon(ico)+'</span>'+label+'</button>').join('');$('#content').innerHTML=({schedule:renderSchedule,import:renderImport,theme:renderTheme,settings:renderSettings}[tab])();bindView();if(tab==='schedule')primeNeighbours();}
 function go(next){tab=next;render();$('#content').scrollTop=0;}
 function visibleCourses(){return sample?demo:T().courses;}
 function reducedMotion(){return matchMedia('(prefers-reduced-motion: reduce)').matches;}
@@ -125,17 +125,55 @@ function resetWeekDrag(stage,direction,offset){
   const page=stage.querySelector('.week-page:not(.week-preview)'),preview=stage.querySelector('.week-preview');
   animateWeekPages(stage,page,preview,direction,offset,false);showWeekFeedback(viewWeek);
 }
-function paintWeekDrag(stage,dx){
-  const direction=dx<0?1:-1,target=viewWeek+direction,page=stage.querySelector('.week-page:not(.week-preview)'),width=stage.clientWidth+12;
-  const valid=target>=1&&target<=T().totalWeeks,offset=valid?Math.max(-width,Math.min(width,dx)):dx*.22;
-  let preview=stage.querySelector('.week-preview');
-  if(valid&&preview?.dataset.week!==String(target)){
-    preview?.remove();preview=document.createElement('div');preview.className='week-page week-preview';preview.dataset.week=target;preview.setAttribute('aria-hidden','true');preview.inert=true;preview.innerHTML=renderTimetable(target);stage.appendChild(preview);
-  }else if(!valid){preview?.remove();preview=null;}
-  page.style.transform='translateX('+offset+'px)';
-  if(preview)preview.style.transform='translateX('+(offset+direction*width)+'px)';
-  showWeekFeedback(valid?target:viewWeek,true);
-  return {direction,offset};
+let neighbourCache={week:0,prev:null,next:null};
+function buildNeighbourPage(target){
+  const el=document.createElement('div');
+  el.className='week-page week-preview';
+  el.dataset.week=String(target);
+  el.setAttribute('aria-hidden','true');
+  el.inert=true;
+  el.innerHTML=renderTimetable(target);
+  return el;
+}
+// 空闲时先把左右相邻的两周渲染好，拖动开始时就不用现建 DOM，第一帧不会卡一下。
+function primeNeighbours(){
+  const week=viewWeek,total=T().totalWeeks;
+  if(neighbourCache.week===week&&(neighbourCache.prev||neighbourCache.next))return;
+  const build=()=>{
+    if(week!==viewWeek||tab!=='schedule'||weekMotion)return;
+    neighbourCache={week,prev:week>1?buildNeighbourPage(week-1):null,next:week<total?buildNeighbourPage(week+1):null};
+  };
+  if(window.requestIdleCallback)requestIdleCallback(build,{timeout:600});else setTimeout(build,0);
+}
+function takeNeighbourPage(target){
+  const c=neighbourCache;
+  if(c.week===viewWeek){
+    if(target===c.week-1&&c.prev){const el=c.prev;c.prev=null;return el;}
+    if(target===c.week+1&&c.next){const el=c.next;c.next=null;return el;}
+  }
+  if(target<1||target>T().totalWeeks)return null;
+  return buildNeighbourPage(target);
+}
+// 拖动每一帧只改 transform：几何尺寸、节点引用都在手势开始时缓存好，
+// 由 rAF 合并 pointermove，避免一次移动里反复读布局。
+function paintWeekDrag(g,dx){
+  const width=g.width,direction=dx<0?1:-1,target=g.week+direction;
+  const valid=target>=1&&target<=g.totalWeeks;
+  const offset=valid?Math.max(-width,Math.min(width,dx)):dx*.22;
+  if(valid){
+    if(g.previewWeek!==target){
+      if(g.preview)g.preview.remove();
+      g.preview=takeNeighbourPage(target);
+      g.previewWeek=target;
+      if(g.preview)g.stage.appendChild(g.preview);
+    }
+  }else if(g.preview){g.preview.remove();g.preview=null;g.previewWeek=null;}
+  g.page.style.transform='translateX('+offset+'px)';
+  if(g.preview)g.preview.style.transform='translateX('+(offset+direction*width)+'px)';
+  g.offset=offset;g.direction=direction;
+  const shown=valid?target:g.week;
+  if(g.feedbackWeek!==shown){g.feedbackWeek=shown;showWeekFeedback(shown,true);}
+  return g;
 }
 function focusTodayCourses(){
   if(tab!=='schedule')return;
@@ -158,28 +196,45 @@ function bindWeekSwipe(){
   const timetable=$('.week-stage');if(!timetable)return;
   let gesture=null;
   timetable.addEventListener('pointerdown',e=>{
-    if(e.isPrimary===false){if(gesture)resetWeekDrag(timetable,gesture.direction||1,gesture.offset||0);gesture=null;return;}
+    const current=gesture;
+    if(e.isPrimary===false){
+      if(current){gesture=null;if(current.raf)cancelAnimationFrame(current.raf);resetWeekDrag(timetable,current.direction||1,current.offset||0);}
+      return;
+    }
     if((e.pointerType==='mouse'&&e.button!==0)||$('#sheet').open||e.target.closest('.empty-schedule,input,textarea,select'))return;
-    stopWeekMotion();gesture={id:e.pointerId,x:e.clientX,y:e.clientY,time:performance.now(),axis:null,offset:0,direction:1};
+    stopWeekMotion();
+    const page=timetable.querySelector('.week-page:not(.week-preview):not(.week-track-page)');
+    gesture={id:e.pointerId,x:e.clientX,y:e.clientY,time:performance.now(),axis:null,offset:0,direction:1,lastDx:0,raf:0,feedbackWeek:null,
+      stage:timetable,page,width:timetable.clientWidth+12,week:viewWeek,totalWeeks:T().totalWeeks,preview:null,previewWeek:null};
+    if(page)page.classList.add('week-moving');
+    primeNeighbours();
   },{passive:true});
   timetable.addEventListener('pointermove',e=>{
-    if(!gesture||e.pointerId!==gesture.id)return;
-    const dx=Math.abs(e.clientX-gesture.x),dy=Math.abs(e.clientY-gesture.y);
-    if(!gesture.axis&&Math.max(dx,dy)>=12){
-      if(dx>dy*1.4){gesture.axis='x';try{timetable.setPointerCapture(e.pointerId);}catch(_) {}}
-      else if(dy>dx){gesture=null;}
+    const g=gesture;if(!g||e.pointerId!==g.id)return;
+    const dx=e.clientX-g.x,dy=e.clientY-g.y;
+    if(!g.axis&&Math.max(Math.abs(dx),Math.abs(dy))>=12){
+      if(Math.abs(dx)>Math.abs(dy)*1.4){g.axis='x';try{timetable.setPointerCapture(e.pointerId);}catch(_){}}
+      else if(Math.abs(dy)>Math.abs(dx)){gesture=null;return;}
     }
-    if(gesture?.axis==='x')Object.assign(gesture,paintWeekDrag(timetable,e.clientX-gesture.x));
+    if(!g.axis)return;
+    g.lastDx=dx;
+    if(!g.raf)g.raf=requestAnimationFrame(()=>{g.raf=0;if(gesture===g)paintWeekDrag(g,g.lastDx);});
   },{passive:true});
   timetable.addEventListener('pointerup',e=>{
-    const start=gesture;gesture=null;if(!start||e.pointerId!==start.id)return;
-    const dx=e.clientX-start.x,dy=e.clientY-start.y;
-    if(start.axis==='x'&&Math.abs(dx)>=20)suppressCourseClickUntil=Date.now()+400;
-    if(tab!=='schedule'||$('#sheet').open||Math.abs(dx)<56||Math.abs(dx)<=Math.abs(dy)*1.5||performance.now()-start.time>1500){if(start.axis==='x')resetWeekDrag(timetable,start.direction,start.offset);return;}
+    const g=gesture;if(!g||e.pointerId!==g.id)return;
+    gesture=null;if(g.raf){cancelAnimationFrame(g.raf);g.raf=0;}
+    const dx=e.clientX-g.x,dy=e.clientY-g.y;
+    if(g.axis==='x')paintWeekDrag(g,dx);
+    if(g.axis==='x'&&Math.abs(dx)>=20)suppressCourseClickUntil=Date.now()+400;
+    if(tab!=='schedule'||$('#sheet').open||Math.abs(dx)<56||Math.abs(dx)<=Math.abs(dy)*1.5||performance.now()-g.time>1500){if(g.axis==='x')resetWeekDrag(timetable,g.direction,g.offset);return;}
     suppressCourseClickUntil=Date.now()+400;
-    if(!changeWeek(dx<0?1:-1,start.offset)){resetWeekDrag(timetable,start.direction,start.offset);toast(dx<0?'已经是本学期最后一周':'已经是第一周');}
+    if(!changeWeek(dx<0?1:-1,g.offset)){resetWeekDrag(timetable,g.direction,g.offset);toast(dx<0?'已经是本学期最后一周':'已经是第一周');}
   },{passive:true});
-  timetable.addEventListener('pointercancel',()=>{if(gesture?.axis==='x')resetWeekDrag(timetable,gesture.direction,gesture.offset);gesture=null;},{passive:true});
+  timetable.addEventListener('pointercancel',()=>{
+    const g=gesture;gesture=null;
+    if(!g)return;if(g.raf)cancelAnimationFrame(g.raf);
+    if(g.axis==='x')resetWeekDrag(timetable,g.direction,g.offset);
+  },{passive:true});
 }
 function nextClass(){
   if(sample)return {title:'正在体验示例课表',sub:'所有课程均为演示，不会写入你的课表',tag:'PREVIEW'};
