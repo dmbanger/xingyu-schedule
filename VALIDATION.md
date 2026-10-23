@@ -2,6 +2,8 @@
 
 日期：2026-10-22。
 
+0.3.10 验证（高亮改为半透明）：日期栏高亮（`today-highlight`）与整列高亮（`today-column-flash`）原来用不透明的 `--accent-soft`，会盖住壁纸。改为新增的 `--accent-wash` / `--accent-ring` 变量：浅色 `rgba(119,98,198,.17)` / `.55`、樱花 `rgba(179,111,139,.17)` / `.55`、夜间 `rgba(183,161,241,.2)` / `.58`，两处 keyframes 都引用它们，主题在变量层切换。浏览器实测点「今」后列高亮 `background-color` 为 `rgba(119,98,198,0.17)`、描边 `rgba(119,98,198,0.55)`，截图可见壁纸透过底色。`ui-smoke` 16 个流程与 `motion-smoke` 通过；真机（Android 测试设备，versionCode 18，自定义壁纸）周五整列高亮时壁纸与课程卡片都清晰可见。
+
 0.3.9 验证（整列高亮）：`renderTimetable()` 在网格里为今天那一列插入 `.today-column`（`grid-column: 今天+1`、`grid-row: 1 / span 节次数`），元素排在课程卡片之前，所以底色在卡片之下；`focusTodayCourses()` 给它与日期栏同时加高亮类，播放 1.6 秒的强调色淡入淡出（前 42% 保持，之后淡出）。浏览器实测：该元素与网格同高（648px）、宽 48.7px，点「今」后 `background-color` 为 `rgb(234,228,250)`、`box-shadow` 为 2px 内描边，1.6 秒后恢复透明；`motion-smoke`、`swipe-smoke`、`ui-smoke` 16 个流程、29 项单元测试全部通过。真机（Android 测试设备，versionCode 17）：点「今」时周五整列由日期栏到底部第 12 节一起高亮，课程卡片仍在底色之上可正常阅读。
 
 0.3.8 验证（「今」的落点）：以前 `focusTodayCourses()` 会滚到今天正在上或下一门课的卡片位置（还额外减了 46px 偏移），所以点完「今」课表停在中段。现改为滚到课表顶部：取 `.week-stage` 相对 `#content` 的偏移并减去当前滚动量，使日期栏对齐滚动区顶部、第 1 节紧接其下；今日高亮动画与日期提示保持不变，从任意周跳回来都一致。浏览器实测：先把内容滚到 320，再点「今」，`scrollTop` 变为 165，`.week-stage` 顶部与 `#content` 顶部同为 44（差 0px），日期栏 top=45（1px 边框），第 1 节（1 / 08:00 / 08:45）紧接在下方 96 处。`motion-smoke`（含“今”按钮相关全部断言）、`swipe-smoke`、`ui-smoke` 16 个流程通过；真机（Android 测试设备，versionCode 16）从第 3 周先下滑一段再点「今」，日期栏停在上方、第 1 节紧接其下，周五 23 仍高亮。
