@@ -11,6 +11,11 @@ const {pathToFileURL}=require('node:url');
   await page.getByRole('button',{name:'先看看装扮效果 →'}).click();
   assert.equal(await page.locator('.course-card').count(),8);
   await page.screenshot({path:path.join(output,'02-demo.png')});
+  // 顶部两栏：各有一个标签行（内含倒计时位置）、课程名与说明，整块带用于刷新的签名。
+  assert.equal(await page.locator('.next-class').evaluate(n=>n.children.length),2);
+  assert.equal(await page.locator('.next-class .next-tag').count(),2);
+  assert.ok(await page.locator('.next-half').evaluateAll(ns=>ns.every(n=>n.querySelector('.next-tag')&&n.querySelector('strong')&&n.querySelector('small'))));
+  assert.ok(await page.locator('.next-class').getAttribute('data-bar'));
   await page.getByRole('button',{name:'退出示例',exact:true}).click();
   await page.locator('[data-action="add"]').first().click();
   await page.locator('#course-form [name="name"]').fill('本地保存验证');

@@ -247,7 +247,7 @@ function nextClass(){
   const day=(now.getDay()+6)%7+1,minutes=now.getHours()*60+now.getMinutes();
   const list=T().courses.filter(c=>c.weeks.includes(cw)).map(c=>{const t=T().times[c.start-1]?.slice(0,5);const start=t?(+t.slice(0,2)*60+(+t.slice(3))):null;return {...c,t,start};}).filter(c=>c.day>day||(c.day===day&&c.start!==null&&c.start>=minutes)).sort((a,b)=>a.day-b.day||a.start-b.start);
   if(!list.length)return {title:T().courses.length?'本周剩下的时间，自由安排':'还没有属于你的课程',sub:T().courses.length?'愿你在课业之外，也有自己的小宇宙':'从教务导入，或者手动添加第一门课',tag:'✧'};
-  const c=list[0],when=c.day===day?'今天':c.day===day+1?'明天':'周'+['','一','二','三','四','五','六','日'][c.day];return {title:c.name,sub:when+' '+(c.t||'第'+c.start+'节')+' · '+(c.room||'地点待补充'),tag:'下一堂',action:'detail',id:c.id};
+  const c=list[0],when=c.day===day?'今天':c.day===day+1?'明天':'周'+['','一','二','三','四','五','六','日'][c.day];return {title:c.name,sub:when+' '+(c.t||'第'+c.start+'节')+' · '+(c.room||'地点待补充'),tag:'下一堂',action:'detail',id:c.id,day:c.day,startMin:c.start};
 }
 // 当前正在上的课：今天、本周、且当前时间落在这门课的节次区间里。
 function currentClass(){
@@ -259,17 +259,42 @@ function currentClass(){
   return T().courses.filter(c=>c.day===day&&c.weeks.includes(cw)).map(c=>({course:c,...span(c)}))
     .filter(x=>x.start!==null&&x.end!==null&&minutes>=x.start&&minutes<x.end)[0]||null;
 }
+// 倒计时文案：下一堂显示还有多久上课，正在上显示还有多久下课。
+function countdownLabel(minutes,kind){
+  if(minutes==null||!isFinite(minutes))return '';
+  if(kind==='now')return minutes<=1?'即将下课':'还剩 '+minutes+' 分钟';
+  return minutes<=1?'马上开始':minutes+' 分钟后';
+}
 function nextBar(){
   const next=nextClass(),cur=currentClass();
-  const half=(cls,action,id,tag,title,sub)=>'<div class="next-half '+cls+'"'+(action?' data-action="'+action+'" data-id="'+escapeHTML(id||'')+'" role="button" tabindex="0"':'')+'><span class="next-tag">'+escapeHTML(tag)+'</span><strong>'+escapeHTML(title)+'</strong><small>'+escapeHTML(sub)+'</small></div>';
-  let cls='next-now',title,sub,action='',id='';
+  const now=new Date(),todayIdx=(now.getDay()+6)%7+1,nowMin=now.getHours()*60+now.getMinutes();
+  const half=(cls,action,id,tag,title,sub,count)=>'<div class="next-half '+cls+'"'+(action?' data-action="'+action+'" data-id="'+escapeHTML(id||'')+'" role="button" tabindex="0"':'')+'>'+
+    '<span class="next-tag">'+escapeHTML(tag)+(count?'<i class="next-count">'+escapeHTML(count)+'</i>':'')+'</span><strong>'+escapeHTML(title)+'</strong><small>'+escapeHTML(sub)+'</small></div>';
+  let cls='next-now',title,sub,action='',id='',count='';
   if(cur){
     const from=cur.from||'',to=cur.to||'';
     title=cur.course.name;sub=(from&&to?from+'–'+to+' · ':'')+(cur.course.room||'地点待补充');action='detail';id=cur.course.id;
+    count=countdownLabel(cur.end-nowMin,'now');
   }else if(sample){cls+=' muted';title='示例课表';sub='示例模式下只预览样式';}
   else if(!T().semesterConfigured){cls+=' muted';title='尚未设置学期';sub='设置好开学日期后显示当前课程';}
   else{cls+=' muted';title='当前时段没有课';sub='可以休息一下';}
-  return '<div class="next-class">'+half('next-up',next.action,next.id,next.tag==='✧'?'下一堂':next.tag,next.title,next.sub)+half(cls,action,id,'正在上',title,sub)+'</div>';
+  const upCount=(next.day===todayIdx&&next.startMin!=null)?countdownLabel(next.startMin-nowMin,'up'):'';
+  const sig=(cur?cur.course.id+':'+cur.end:'')+'|'+(next.id||next.title)+'|'+(next.startMin==null?'':next.startMin);
+  return '<div class="next-class" data-bar="'+escapeHTML(sig)+'">'+
+    half('next-up',next.action,next.id,next.tag==='✧'?'下一堂':next.tag,next.title,next.sub,upCount)+
+    half(cls,action,id,'正在上',title,sub,count)+'</div>';
+}
+// 每 20 秒刷新一次倒计时；只有“正在上 / 下一堂”真的换了才整页重绘。
+function tickNextBar(){
+  if(tab!=='schedule')return;
+  const bar=document.querySelector('.next-class');if(!bar)return;
+  const next=nextClass(),cur=currentClass();
+  const sig=(cur?cur.course.id+':'+cur.end:'')+'|'+(next.id||next.title)+'|'+(next.startMin==null?'':next.startMin);
+  if(sig!==bar.dataset.bar){const top=$('#content').scrollTop;render();$('#content').scrollTop=top;return;}
+  const now=new Date(),todayIdx=(now.getDay()+6)%7+1,nowMin=now.getHours()*60+now.getMinutes();
+  const nowEl=bar.querySelector('.next-now .next-count'),upEl=bar.querySelector('.next-up .next-count');
+  if(nowEl&&cur)nowEl.textContent=countdownLabel(cur.end-nowMin,'now');
+  if(upEl&&next.day===todayIdx&&next.startMin!=null)upEl.textContent=countdownLabel(next.startMin-nowMin,'up');
 }
 function renderSchedule(){
   const s=T(),start=C.monday(C.parseDate(s.semesterStart));start.setDate(start.getDate()+(viewWeek-1)*7);const next=nextClass(),today=C.dateString(new Date());
@@ -423,3 +448,7 @@ $('#sheet').addEventListener('click',e=>{if(e.target===$('#sheet')){const r=$('#
 $('#browser-import').onchange=async e=>{const file=e.target.files[0];if(file){if(file.size>2*1024*1024)importError('请选择小于 2 MB 的文件');else window.receiveImportFile(await file.text());}e.target.value='';};
 $('#browser-background').onchange=e=>{const file=e.target.files[0];if(!file)return;if(file.size>4*1024*1024){toast('浏览器预览请选择小于 4 MB 的图片');return;}const reader=new FileReader();reader.onload=()=>{try{localStorage.setItem('xingyu-wallpaper',reader.result);window.receiveBackground();}catch(_){toast('浏览器存储空间不足');}};reader.readAsDataURL(file);e.target.value='';};
 render();
+// 每 20 秒刷新「下一堂 / 正在上」的倒计时
+setInterval(tickNextBar,20000);
+// 回到前台时立刻补一次：后台时定时器会被系统降频，解锁后不该先看到十几分钟前的数字
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)tickNextBar();});

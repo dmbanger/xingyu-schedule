@@ -87,7 +87,8 @@ body.immersive .today-fab{bottom:22px}
 .next-half{display:flex;flex-direction:column;gap:3px;min-width:0;padding:2px 11px;color:inherit}
 .next-half+.next-half{border-left:1px solid var(--line)}
 .next-half[data-action]{cursor:pointer}
-.next-half .next-tag{font-size:9px;letter-spacing:1.2px;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.next-half .next-tag{font-size:9px;letter-spacing:1.2px;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:baseline;justify-content:space-between;gap:6px}
+.next-half .next-count{font-style:normal;font-size:10px;font-weight:700;letter-spacing:0;color:var(--accent);flex:none}
 .next-half strong{font-size:12px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .next-half small{font-size:9px;color:var(--muted);line-height:1.45;overflow:hidden;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical}
 .next-half.muted strong{color:var(--muted);font-weight:600}
