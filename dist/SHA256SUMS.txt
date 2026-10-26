@@ -1,2 +1,2 @@
-﻿e0238e91bebc62646aff8a7e7ea4eb9290cbc9a1a0c49d8f9673eddfac4606df  XingyuSchedule-0.4.1.apk
-fb4971096d83eefeb51cbb114e22ea35987814c64944593f3886bf3d5e47df4a  XingyuSchedule-0.4.1-source.zip
+﻿6cbf8e821459ae74f4ca7dd98d003b8c71a10985a899f0e4fca3c296a1d970f9  XingyuSchedule-0.4.2.apk
+6b03da86fc2ce51e1898f3b0fcca76d7f0c2e3eb1f556ec6f6e6891605e359c3  XingyuSchedule-0.4.2-source.zip

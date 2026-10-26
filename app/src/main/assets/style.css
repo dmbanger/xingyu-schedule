@@ -96,6 +96,7 @@ html.sheet-open #wallpaper,html.sheet-open .veil,html.sheet-open #app{transform:
 .button.ghost{color:var(--ink);background:var(--panel);border:.5px solid var(--glass-border);box-shadow:var(--shadow-1)}
 dialog .button.ghost{background:var(--fill);border:0;box-shadow:none}
 .button.danger{background:rgba(255,59,48,.12);color:#e0342b;box-shadow:none}
+.button.destructive{background:linear-gradient(180deg,#ff6a61,#ff3b30);color:#fff;box-shadow:0 8px 20px rgba(255,59,48,.3),inset 0 1px 0 rgba(255,255,255,.28)}
 .button.full{width:100%}
 .button.small{min-height:34px;padding:7px 15px;font-size:13.5px}
 .button-group{display:flex;gap:10px;flex-wrap:wrap}
@@ -139,14 +140,16 @@ dialog .button.ghost{background:var(--fill);border:0;box-shadow:none}
 @keyframes live-ping{0%{transform:scale(1);opacity:.6}80%,100%{transform:scale(2.8);opacity:0}}
 
 /* 课表切换胶囊 */
-.timetable-row{display:flex;align-items:center;gap:8px;margin:0 2px 10px}
-.timetable-chip{display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:6px 12px 6px 10px;border:.5px solid var(--glass-border);border-radius:999px;background:var(--panel);color:var(--ink);font-size:13px;font-weight:650;line-height:1.2;box-shadow:var(--shadow-1);transition:transform .4s var(--spring)}
+.timetable-row{display:flex;align-items:center;gap:8px;min-width:0;margin:0 2px 10px}
+.timetable-chip{display:inline-flex;align-items:center;gap:6px;min-width:0;max-width:100%;white-space:nowrap;padding:6px 12px 6px 10px;border:.5px solid var(--glass-border);border-radius:999px;background:var(--panel);color:var(--ink);font-size:13px;font-weight:650;line-height:1.2;box-shadow:var(--shadow-1);transition:transform .4s var(--spring)}
 .timetable-chip:active{transform:scale(.95)}
-.timetable-chip .chip-icon{display:inline-grid;place-items:center;color:var(--accent)}
+.timetable-chip .chip-icon{display:inline-grid;place-items:center;flex:none;color:var(--accent)}
+.chip-name{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.timetable-chip .caret{flex:none}
 .timetable-chip .chip-icon svg{width:15px;height:15px}
 .caret{display:inline-block;width:6px;height:6px;margin:0 2px 0 7px;border-right:1.8px solid currentColor;border-bottom:1.8px solid currentColor;border-radius:1px;transform:translateY(-2px) rotate(45deg);opacity:.45}
 .timetable-chip .caret{margin-left:4px}
-.chip-count{font-size:12px;font-weight:600;color:var(--muted);background:var(--panel);padding:5px 10px;border-radius:999px}
+.chip-count{flex:none;white-space:nowrap;font-size:12px;font-weight:600;color:var(--muted);background:var(--panel);padding:5px 10px;border-radius:999px}
 
 /* ---------- 课表网格 ---------- */
 .timetable{--row-height:56px;--label-col:30px;position:relative;border-radius:20px;overflow:visible;clip-path:inset(0 round 20px);background:var(--grid-bg);box-shadow:inset 0 0 0 .5px var(--glass-border)}
@@ -281,7 +284,7 @@ dialog .button.ghost{background:var(--fill);border:0;box-shadow:none}
 .tint-orange{background:linear-gradient(180deg,#ffa53a,#ff8a00)}.tint-blue{background:linear-gradient(180deg,#4fa8ff,#0a7cff)}.tint-purple{background:linear-gradient(180deg,#b590ff,#8a5cf6)}
 .tint-green{background:linear-gradient(180deg,#4fdc72,#28c04c)}.tint-teal{background:linear-gradient(180deg,#5ad4e6,#1fb2c9)}.tint-gray{background:linear-gradient(180deg,#a9a9b3,#8a8a94)}
 .tint-red{background:linear-gradient(180deg,#ff6e66,#ff3b30)}.tint-indigo{background:linear-gradient(180deg,#8380ff,#5856d6)}
-.settings-footer{text-align:center;font-size:12px;color:var(--muted);line-height:2;letter-spacing:.06em;margin:30px 0 10px}
+.settings-footer{text-align:center;font-size:12px;color:var(--ink-2);text-shadow:0 0 12px var(--panel-solid),0 0 3px var(--panel-solid),0 0 1px var(--panel-solid);line-height:2;letter-spacing:.06em;margin:30px 0 10px}
 .settings-footer .footer-star{width:44px;height:44px;margin:0 auto 10px;border-radius:13px;display:grid;place-items:center;font-size:22px;color:#fff;background:linear-gradient(150deg,var(--accent-2),var(--accent));box-shadow:0 8px 20px var(--accent-shadow)}
 .settings-footer .footer-sign{display:block;margin-top:4px;font-size:11px;letter-spacing:.16em;opacity:.7}
 
@@ -314,10 +317,10 @@ button.preview-course:active{transform:scale(.97)}
 .preview-course strong{font-size:15px;font-weight:650;display:block}
 .preview-course small{font-size:12.5px;color:var(--muted);display:block;line-height:1.65;margin-top:3px}
 .color-options{display:flex;gap:14px;margin:4px 4px 24px}
-.color-swatch{width:34px;height:34px;border-radius:50%;border:0;color:transparent;padding:0;background:#8b72e8;box-shadow:0 0 0 0 transparent,inset 0 0 0 .5px rgba(0,0,0,.08);transition:transform .4s var(--spring),box-shadow .25s ease}
-.color-swatch.selected{transform:scale(1.08);box-shadow:0 0 0 3px var(--sheet-bg),0 0 0 5px currentColor}
-.color-swatch.lavender{background:#8b72e8;color:#8b72e8}.color-swatch.rose{background:#f06292;color:#f06292}.color-swatch.mint{background:#30be82;color:#30be82}
-.color-swatch.sky{background:#3896f0;color:#3896f0}.color-swatch.peach{background:#ff963e;color:#ff963e}.color-swatch.lemon{background:#e2b400;color:#e2b400}
+.color-swatch{--sw:#8b72e8;width:34px;height:34px;flex:none;border-radius:50%;border:0;padding:0;font-size:0;color:transparent;background:var(--sw);box-shadow:inset 0 0 0 .5px rgba(0,0,0,.08);transition:transform .4s var(--spring),box-shadow .25s ease}
+.color-swatch:active{transform:scale(.9)}
+.color-swatch.selected{transform:scale(1.08);box-shadow:0 0 0 3px var(--sheet-bg),0 0 0 5px var(--sw)}
+.color-swatch.rose{--sw:#f06292}.color-swatch.mint{--sw:#30be82}.color-swatch.sky{--sw:#3896f0}.color-swatch.peach{--sw:#ff963e}.color-swatch.lemon{--sw:#e2b400}
 .timetable-list{display:flex;flex-direction:column;gap:8px;margin:12px 0 16px}
 .timetable-item{display:flex;align-items:center;gap:8px;padding:12px 14px;border:0;border-radius:16px;background:var(--fill)}
 .timetable-item.active{background:var(--accent-soft);box-shadow:inset 0 0 0 1.5px var(--accent-ring)}
@@ -362,7 +365,7 @@ body[data-theme=night]{--accent:#b6a1ff;--accent-2:#d4c6ff;--accent-soft:rgba(18
   --sheet-bg:#1b1929;--sheet-head-bg:rgba(27,25,41,.84);--grabber:rgba(255,255,255,.22);--edge:inset 0 1px 0 rgba(255,255,255,.06);
   --shadow-1:0 1px 2px rgba(0,0,0,.24),0 10px 30px rgba(0,0,0,.26);--shadow-2:0 2px 8px rgba(0,0,0,.3),0 20px 50px rgba(0,0,0,.42);background:#0e0c1a}
 body[data-theme=night] .veil{background:linear-gradient(180deg,rgba(12,10,24,.86),rgba(16,14,32,.58) 38%,rgba(12,10,24,.82))}
-body[data-theme=night] .button:not(.secondary):not(.ghost):not(.danger),body[data-theme=night] .today-fab,body[data-theme=night] .week-grid button.active,body[data-theme=night] .day.today span{color:#1b1530}
+body[data-theme=night] .button:not(.secondary):not(.ghost):not(.danger):not(.destructive),body[data-theme=night] .today-fab,body[data-theme=night] .week-grid button.active,body[data-theme=night] .day.today span{color:#1b1530}
 body[data-theme=night] .course-card{color:var(--c-glow);background:rgba(var(--c-rgb),calc(var(--card-alpha) * .3));box-shadow:inset 2.5px 0 0 rgb(var(--c-rgb)),inset 0 0 0 .5px rgba(255,255,255,.07)}
 body[data-theme=night] .import-hero{background:linear-gradient(160deg,rgba(44,38,72,.86),rgba(30,27,47,.66))}
 body[data-theme=night] .notice.warning{color:#ffcf7a}
