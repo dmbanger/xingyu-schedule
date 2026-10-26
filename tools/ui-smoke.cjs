@@ -27,7 +27,8 @@ const {pathToFileURL}=require('node:url');
   assert.equal(await page.locator('.course-card').count(),1);
   await page.locator('[data-tab="theme"]').click();
   await page.locator('[data-theme="sakura"]').click();
-  assert.equal(await page.locator('body').getAttribute('data-theme'),'sakura');
+  // 换主题走 View Transition，新主题在下一帧才生效
+  await page.waitForFunction(()=>document.body.dataset.theme==='sakura');
   await page.screenshot({path:path.join(output,'03-themes.png')});
   await page.locator('[data-theme="night"]').click();
   await page.screenshot({path:path.join(output,'04-night.png')});

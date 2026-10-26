@@ -9,6 +9,7 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.net.http.SslError;
 import android.os.Bundle;
+import android.view.HapticFeedbackConstants;
 import android.view.View;
 import android.view.WindowInsets;
 import android.webkit.CookieManager;
@@ -52,19 +53,34 @@ public final class MainActivity extends Activity {
     private boolean desktopMode;
     private String mobileUserAgent;
     private String pendingExport = "";
+    private int insetTop, insetBottom;
+    private boolean darkTheme;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         desktopMode=getSharedPreferences("browser",MODE_PRIVATE).getBoolean("desktop_mode",true);
-        getWindow().setStatusBarColor(Color.rgb(247,245,253));
-        getWindow().setNavigationBarColor(Color.rgb(247,245,253));
+        // 全面屏：壁纸铺到状态栏和手势条下面，系统栏高度交给网页用 CSS 变量自己留白。
+        getWindow().setStatusBarColor(Color.TRANSPARENT);
+        getWindow().setNavigationBarColor(Color.TRANSPARENT);
+        if (android.os.Build.VERSION.SDK_INT >= 29) { getWindow().setStatusBarContrastEnforced(false); getWindow().setNavigationBarContrastEnforced(false); }
+        if (android.os.Build.VERSION.SDK_INT >= 30) getWindow().setDecorFitsSystemWindows(false);
+        else getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE|View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN|View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION|View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
         root = new FrameLayout(this);
         root.setBackgroundColor(Color.rgb(247,245,253));
         root.setOnApplyWindowInsetsListener((v,insets)->{
+            int left,top,right,bottom,ime;
             if (android.os.Build.VERSION.SDK_INT >= 30) {
-                android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout() | WindowInsets.Type.ime());
-                v.setPadding(bars.left,bars.top,bars.right,bars.bottom);
-            } else v.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom());
+                android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+                left=bars.left;top=bars.top;right=bars.right;bottom=bars.bottom;ime=insets.getInsets(WindowInsets.Type.ime()).bottom;
+            } else {
+                left=insets.getSystemWindowInsetLeft();top=insets.getSystemWindowInsetTop();right=insets.getSystemWindowInsetRight();bottom=insets.getStableInsetBottom();
+                ime=insets.getSystemWindowInsetBottom()>bottom?insets.getSystemWindowInsetBottom():0;
+            }
+            // 键盘弹出时整页上移到键盘之上（相当于 adjustResize），此时网页底部不用再给手势条留白。
+            v.setPadding(left,0,right,ime);
+            insetTop=top;insetBottom=ime>0?0:bottom;
+            if(schoolPanel!=null)schoolPanel.setPadding(0,top,0,ime>0?0:bottom);
+            pushInsets();
             return insets;
         });
         setContentView(root);
@@ -86,6 +102,7 @@ public final class MainActivity extends Activity {
         appView.addJavascriptInterface(new LocalBridge(), "Native");
         appView.setWebViewClient(new WebViewClient(){
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) { return !isLocal(request.getUrl()); }
+            @Override public void onPageFinished(WebView view, String url) { pushInsets(); }
             @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                 Uri uri=request.getUrl();
                 if(!isLocal(uri))return response("text/plain",new byte[0]);
@@ -106,6 +123,27 @@ public final class MainActivity extends Activity {
     private static String mime(String p){if(p.endsWith(".js"))return "application/javascript";if(p.endsWith(".css"))return "text/css";if(p.endsWith(".jpg"))return "image/jpeg";if(p.endsWith(".png"))return "image/png";if(p.endsWith(".svg"))return "image/svg+xml";return "text/html";}
     private void notifyJs(String function,String value){appView.evaluateJavascript("window."+function+"&&window."+function+"("+JSONObject.quote(value)+")",null);}
     private void message(String s){Toast.makeText(this,s,Toast.LENGTH_LONG).show();}
+    private String insetsText(){float d=getResources().getDisplayMetrics().density;return Math.round(insetTop/d)+","+Math.round(insetBottom/d);}
+    private void pushInsets(){if(appView!=null)appView.evaluateJavascript("window.applyInsets&&window.applyInsets('"+insetsText()+"')",null);}
+    private void setDarkBars(boolean dark){setDarkBars(dark,dark);}
+    /** dark=true 表示背景是深色，系统栏图标用白色。弹层打开时页面顶部变暗，只把状态栏换成白色图标。 */
+    private void setDarkBars(boolean statusDark,boolean navDark){
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            int status=android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS,nav=android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
+            getWindow().getInsetsController().setSystemBarsAppearance((statusDark?0:status)|(navDark?0:nav),status|nav);
+        } else {
+            int flags=View.SYSTEM_UI_FLAG_LAYOUT_STABLE|View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN|View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
+            getWindow().getDecorView().setSystemUiVisibility(flags|(statusDark?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR)|(navDark?0:View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR));
+        }
+        root.setBackgroundColor(navDark?Color.rgb(20,18,32):Color.rgb(247,245,253));
+    }
+    private int hapticConstant(String kind){
+        int sdk=android.os.Build.VERSION.SDK_INT;
+        if("confirm".equals(kind))return sdk>=30?HapticFeedbackConstants.CONFIRM:HapticFeedbackConstants.CONTEXT_CLICK;
+        if("reject".equals(kind))return sdk>=30?HapticFeedbackConstants.REJECT:HapticFeedbackConstants.LONG_PRESS;
+        if("soft".equals(kind))return sdk>=34?HapticFeedbackConstants.SEGMENT_FREQUENT_TICK:HapticFeedbackConstants.CLOCK_TICK;
+        return sdk>=34?HapticFeedbackConstants.SEGMENT_TICK:HapticFeedbackConstants.CLOCK_TICK;
+    }
     private byte[] readLimited(InputStream in,int limit)throws Exception{try(InputStream stream=in;ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] b=new byte[8192];int n;while((n=stream.read(b))!=-1){if(out.size()+n>limit)throw new Exception("文件过大，请选择小于 "+(limit/1024/1024)+" MB 的文件");out.write(b,0,n);}return out.toByteArray();}}
     private String assetText(String name)throws Exception{return new String(readLimited(getAssets().open(name),2*1024*1024),StandardCharsets.UTF_8);}
 
@@ -119,6 +157,9 @@ public final class MainActivity extends Activity {
         @JavascriptInterface public void pickImportFile(){runOnUiThread(()->{Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);intent.setType("*/*");intent.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"application/json","text/*","application/octet-stream"});intent.addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(intent,PICK_IMPORT);});}
         @JavascriptInterface public void exportBackup(String data){runOnUiThread(()->{if(data.length()>2*1024*1024){message("备份过大");return;}pendingExport=data;Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);intent.addCategory(Intent.CATEGORY_OPENABLE);intent.setType("application/json");intent.putExtra(Intent.EXTRA_TITLE,"星屿课表-备份.json");startActivityForResult(intent,SAVE_BACKUP);});}
         @JavascriptInterface public void openSchool(String url){runOnUiThread(()->showSchool(url));}
+        @JavascriptInterface public String insets(){return insetsText();}
+        @JavascriptInterface public void systemBars(boolean dark,boolean sheetOpen){runOnUiThread(()->{darkTheme=dark;if(schoolPanel==null||schoolPanel.getVisibility()!=View.VISIBLE)setDarkBars(dark||sheetOpen,dark);});}
+        @JavascriptInterface public void haptic(String kind){runOnUiThread(()->appView.performHapticFeedback(hapticConstant(kind)));}
         @JavascriptInterface public void clearSchoolSession(){runOnUiThread(()->{if(schoolView!=null){root.removeView(schoolPanel);schoolView.clearCache(true);schoolView.clearHistory();schoolView.destroy();schoolView=null;schoolPanel=null;}CookieManager.getInstance().removeAllCookies(ok->message("教务网站登录状态已清除"));android.webkit.WebStorage.getInstance().deleteAllData();});}
     }
     private boolean validWebUrl(String text){try{Uri u=Uri.parse(text);return ("https".equals(u.getScheme())||"http".equals(u.getScheme()))&&u.getHost()!=null&&u.getUserInfo()==null;}catch(Exception e){return false;}}
@@ -151,8 +192,10 @@ public final class MainActivity extends Activity {
             });
             schoolView.setWebChromeClient(new WebChromeClient());
             schoolPanel.addView(schoolView,new LinearLayout.LayoutParams(-1,0,1));root.addView(schoolPanel,new FrameLayout.LayoutParams(-1,-1));
+            schoolPanel.setPadding(0,insetTop,0,insetBottom);
         }
-        schoolPanel.setVisibility(View.VISIBLE);schoolView.loadUrl(url);
+        // 教务浏览器是白底，状态栏图标要用深色。
+        setDarkBars(false);schoolPanel.setVisibility(View.VISIBLE);schoolView.loadUrl(url);
     }
     private void applySchoolBrowserMode(){
         WebSettings s=schoolView.getSettings();
@@ -160,7 +203,7 @@ public final class MainActivity extends Activity {
         s.setUserAgentString(desktopMode?desktopUserAgent:mobileUserAgent);
         s.setUseWideViewPort(true);s.setLoadWithOverviewMode(true);s.setTextZoom(100);s.setLayoutAlgorithm(WebSettings.LayoutAlgorithm.NORMAL);schoolView.setInitialScale(0);
     }
-    private void hideSchool(){if(schoolPanel!=null)schoolPanel.setVisibility(View.GONE);}
+    private void hideSchool(){if(schoolPanel!=null)schoolPanel.setVisibility(View.GONE);setDarkBars(darkTheme);}
     private void captureSchool(){
         try{schoolView.evaluateJavascript(assetText("extract.js"),raw->{
             try{Object result=new JSONTokener(raw).nextValue();if(!(result instanceof String))throw new Exception("页面暂不支持识别");String text=(String)result;if(text.length()>2*1024*1024)throw new Exception("页面过大，请进入个人课表页面");new JSONObject(text);hideSchool();notifyJs("receiveSchoolSnapshot",text);}catch(Exception e){message("识别失败："+e.getMessage());}
