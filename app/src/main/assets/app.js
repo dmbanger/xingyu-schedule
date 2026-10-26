@@ -249,11 +249,33 @@ function nextClass(){
   if(!list.length)return {title:T().courses.length?'本周剩下的时间，自由安排':'还没有属于你的课程',sub:T().courses.length?'愿你在课业之外，也有自己的小宇宙':'从教务导入，或者手动添加第一门课',tag:'✧'};
   const c=list[0],when=c.day===day?'今天':c.day===day+1?'明天':'周'+['','一','二','三','四','五','六','日'][c.day];return {title:c.name,sub:when+' '+(c.t||'第'+c.start+'节')+' · '+(c.room||'地点待补充'),tag:'下一堂',action:'detail',id:c.id};
 }
+// 当前正在上的课：今天、本周、且当前时间落在这门课的节次区间里。
+function currentClass(){
+  if(sample||!T().semesterConfigured)return null;
+  const cw=currentWeek();if(cw<1||cw>T().totalWeeks)return null;
+  const now=new Date(),day=(now.getDay()+6)%7+1,minutes=now.getHours()*60+now.getMinutes(),times=T().times;
+  const span=c=>{const from=times[c.start-1]?.slice(0,5),to=times[c.end-1]?.slice(6);
+    return {from,to,start:from?Number(from.slice(0,2))*60+Number(from.slice(3,5)):null,end:to?Number(to.slice(0,2))*60+Number(to.slice(3,5)):null};};
+  return T().courses.filter(c=>c.day===day&&c.weeks.includes(cw)).map(c=>({course:c,...span(c)}))
+    .filter(x=>x.start!==null&&x.end!==null&&minutes>=x.start&&minutes<x.end)[0]||null;
+}
+function nextBar(){
+  const next=nextClass(),cur=currentClass();
+  const half=(cls,action,id,tag,title,sub)=>'<div class="next-half '+cls+'"'+(action?' data-action="'+action+'" data-id="'+escapeHTML(id||'')+'" role="button" tabindex="0"':'')+'><span class="next-tag">'+escapeHTML(tag)+'</span><strong>'+escapeHTML(title)+'</strong><small>'+escapeHTML(sub)+'</small></div>';
+  let cls='next-now',title,sub,action='',id='';
+  if(cur){
+    const from=cur.from||'',to=cur.to||'';
+    title=cur.course.name;sub=(from&&to?from+'–'+to+' · ':'')+(cur.course.room||'地点待补充');action='detail';id=cur.course.id;
+  }else if(sample){cls+=' muted';title='示例课表';sub='示例模式下只预览样式';}
+  else if(!T().semesterConfigured){cls+=' muted';title='尚未设置学期';sub='设置好开学日期后显示当前课程';}
+  else{cls+=' muted';title='当前时段没有课';sub='可以休息一下';}
+  return '<div class="next-class">'+half('next-up',next.action,next.id,next.tag==='✧'?'下一堂':next.tag,next.title,next.sub)+half(cls,action,id,'正在上',title,sub)+'</div>';
+}
 function renderSchedule(){
   const s=T(),start=C.monday(C.parseDate(s.semesterStart));start.setDate(start.getDate()+(viewWeek-1)*7);const next=nextClass(),today=C.dateString(new Date());
   let html=sample?'<div class="notice demo">示例模式 · 不会改动你的课表<button class="text-button" data-action="exit-demo">退出示例</button></div>':'';
   html+='<div class="week-toolbar"><div class="month-label">'+(start.getMonth()+1)+'月 <small>'+start.getFullYear()+' · '+escapeHTML(state.settings.schoolName||'我的学期')+'</small></div><div class="week-switch"><button class="icon-button" data-action="prev-week" aria-label="上一周" '+(viewWeek===1?'disabled':'')+'>‹</button><button class="week-current" data-action="week-picker">第 '+viewWeek+' / '+s.totalWeeks+' 周 ⌄</button><button class="icon-button" data-action="next-week" aria-label="下一周" '+(viewWeek===s.totalWeeks?'disabled':'')+'>›</button></div></div>';
-  html+='<div class="next-class" '+(next.action?'data-action="'+next.action+'" data-id="'+escapeHTML(next.id||'')+'" role="button" tabindex="0"':'')+'><span class="next-icon">'+icon('clock')+'</span><div class="next-text"><strong>'+escapeHTML(next.title)+'</strong><small>'+escapeHTML(next.sub)+'</small></div><span class="tag">'+escapeHTML(next.tag)+'</span></div>';
+  html+=nextBar();
   const weekCourses=visibleCourses().filter(c=>c.weeks.includes(viewWeek));
   html+='<div class="timetable-row"><button class="timetable-chip" data-action="switch-timetable"><span class="chip-icon">'+icon('calendar')+'</span>'+escapeHTML(s.name)+'<span class="chip-caret">⌄</span></button>'+(state.timetables.length>1?'<span class="chip-count">共 '+state.timetables.length+' 张</span>':'')+'</div>';
   html+='<div class="week-stage" aria-label="第 '+viewWeek+' 周课表"><div class="week-page">'+renderTimetable(viewWeek)+'</div></div><div class="below-grid">'+(sample?'示例课程 · 仅用于展示装扮效果':weekCourses.length?'本周 '+weekCourses.length+' 项安排 · 点击课程查看详情':'本周暂无课程 · 可以切换教学周查看')+'</div>';
