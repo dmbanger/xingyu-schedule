@@ -290,56 +290,98 @@ function nextClass(){
   if(!list.length)return {title:T().courses.length?'本周剩下的时间，自由安排':'还没有属于你的课程',sub:T().courses.length?'愿你在课业之外，也有自己的小宇宙':'从教务导入，或者手动添加第一门课',tag:'✧'};
   const c=list[0],when=c.day===day?'今天':c.day===day+1?'明天':'周'+['','一','二','三','四','五','六','日'][c.day];return {title:c.name,sub:when+' '+(c.t||'第'+c.start+'节')+' · '+(c.room||'地点待补充'),tag:'下一堂',action:'detail',id:c.id,day:c.day,startMin:c.start};
 }
-// 当前正在上的课：今天、本周、且当前时间落在这门课的节次区间里。
-function currentClass(){
+// “正在上”一栏的当前状态，按今天的作息逐节判断：
+//   class —— 正在上某门课；
+//   break —— 同一门连堂课两节之间的课间（如第 3、4 节之间那 5 分钟）；
+//   gap   —— 两节之间的课间：上一节刚下课、下一节接着有课。上一节空着的话不算课间（比如午后第一节课前）。
+// slots 是这段时间线上的各节（起止分钟），供进度条按节分段、在中间画出课间。
+function nowStatus(){
   if(sample||!T().semesterConfigured)return null;
   const cw=currentWeek();if(cw<1||cw>T().totalWeeks)return null;
-  const now=new Date(),day=(now.getDay()+6)%7+1,minutes=now.getHours()*60+now.getMinutes(),times=T().times;
-  const span=c=>{const from=times[c.start-1]?.slice(0,5),to=times[c.end-1]?.slice(6);
-    return {from,to,start:from?Number(from.slice(0,2))*60+Number(from.slice(3,5)):null,end:to?Number(to.slice(0,2))*60+Number(to.slice(3,5)):null};};
-  return T().courses.filter(c=>c.day===day&&c.weeks.includes(cw)).map(c=>({course:c,...span(c)}))
-    .filter(x=>x.start!==null&&x.end!==null&&minutes>=x.start&&minutes<x.end)[0]||null;
+  const now=new Date(),day=(now.getDay()+6)%7+1,m=now.getHours()*60+now.getMinutes()+now.getSeconds()/60,times=T().times;
+  const at=t=>Number(t.slice(0,2))*60+Number(t.slice(3,5));
+  const slot=p=>{const t=times[p-1];return t?{p,start:at(t.slice(0,5)),end:at(t.slice(6)),from:t.slice(0,5),to:t.slice(6,11)}:null;};
+  const today=T().courses.filter(c=>c.day===day&&c.weeks.includes(cw));
+  for(const c of today){
+    const slots=[];for(let p=c.start;p<=c.end;p++){const x=slot(p);if(x)slots.push(x);}
+    if(!slots.length)continue;
+    const first=slots[0],last=slots[slots.length-1];
+    if(m<first.start||m>=last.end)continue;
+    const i=slots.findIndex((x,k)=>k<slots.length-1&&m>=x.end&&m<slots[k+1].start);
+    // 正在上课时，这门课后面还有课间的话记下课间开始的时刻，用来倒数“距课间”
+    const k=slots.findIndex(x=>m>=x.start&&m<x.end),breakStart=i<0&&k>=0&&k<slots.length-1&&slots[k+1].start>slots[k].end?slots[k].end:null;
+    return {kind:i<0?'class':'break',course:c,slots,from:first.from,to:last.to,start:first.start,end:last.end,resume:i<0?null:slots[i+1],breakStart};
+  }
+  for(let p=1;p<times.length;p++){
+    const a=slot(p),b=slot(p+1);if(!a||!b||m<a.end||m>=b.start)continue;
+    const next=today.find(c=>c.start===p+1),prev=today.find(c=>c.start<=p&&c.end>=p);if(!next||!prev)return null;
+    return {kind:'gap',course:next,prev,slots:[a,b],start:a.start,end:b.end,resume:b};
+  }
+  return null;
 }
-// 倒计时文案：下一堂显示还有多久上课，正在上显示还有多久下课。
+// 倒计时文案：下一堂显示还有多久上课，正在上显示还有多久下课，课间显示还有多久上课。
 function countdownLabel(minutes,kind){
   if(minutes==null||!isFinite(minutes))return '';
   if(kind==='now')return minutes<=1?'即将下课':'还剩 '+minutes+' 分钟';
+  if(kind==='break')return minutes<=1?'马上上课':'还剩 '+minutes+' 分钟';
+  if(kind==='tobreak')return minutes<=1?'马上课间':'距课间 '+minutes+' 分钟';
   return minutes<=1?'马上开始':minutes+' 分钟后';
 }
-// 这节课已经上了多少（0–1），用于“正在上”下方的进度条。
-function classProgress(cur){const now=new Date(),m=now.getHours()*60+now.getMinutes()+now.getSeconds()/60;return Math.max(0,Math.min(1,(m-cur.start)/Math.max(1,cur.end-cur.start))).toFixed(4);}
+// 右上角的胶囊：上课时倒数到下一个课间（这门课已没有课间就倒数到下课），课间时倒数到继续上课。
+function statusCount(st,nowMin){if(st.kind!=='class')return countdownLabel(st.resume.start-nowMin,'break');return st.breakStart!=null?countdownLabel(st.breakStart-nowMin,'tobreak'):countdownLabel(st.end-nowMin,'now');}
+// 胶囊上方的小字：连堂课里离整门课下课还有多久；胶囊本身已经在倒数下课时不显示。
+function statusTotal(st,nowMin){return st.kind==='break'||(st.kind==='class'&&st.breakStart!=null)?'距下课 '+(st.end-nowMin)+' 分钟':'';}
+// 时间线由“节、课间、节……”几段组成。节按真实分钟数占宽；课间只有 5–10 分钟，按真实比例会窄到看不见，
+// 所以至少占总长的 10%。进度也按同样的权重换算，白点的位置和画出来的分段始终对得上。
+function timelinePieces(st){
+  const total=st.end-st.start,pieces=[];
+  st.slots.forEach((x,i)=>{
+    if(i){const a=st.slots[i-1].end;pieces.push({gap:true,now:st.kind!=='class'&&x===st.resume,start:a,end:x.start,w:Math.max(x.start-a,total*.1)});}
+    pieces.push({gap:false,start:x.start,end:x.end,w:x.end-x.start});
+  });
+  return pieces;
+}
+function statusProgress(st){
+  const now=new Date(),m=now.getHours()*60+now.getMinutes()+now.getSeconds()/60,pieces=timelinePieces(st),sum=pieces.reduce((n,x)=>n+x.w,0);
+  let pos=0;for(const x of pieces){if(m>=x.end){pos+=x.w;continue;}if(m>x.start)pos+=x.w*(m-x.start)/Math.max(1,x.end-x.start);break;}
+  return (Math.max(0,Math.min(1,pos/sum))*100).toFixed(2)+'%';
+}
+function timelineHTML(st){
+  const parts=timelinePieces(st).map(x=>'<span class="'+(x.gap?'tl-gap'+(x.now?' now':''):'tl-seg')+'" style="flex:'+x.w.toFixed(2)+'"></span>').join('');
+  return '<span class="next-timeline'+(st.kind==='class'?'':' in-break')+'" aria-hidden="true" style="--p:'+statusProgress(st)+'"><span class="tl-track">'+parts+'</span><span class="tl-fill">'+parts+'</span><i class="tl-dot"></i></span>';
+}
+function statusSig(st,next){return (st?st.kind+':'+st.course.id+':'+st.end+':'+(st.resume?st.resume.p:'')+':'+(st.breakStart==null?'':st.breakStart):'')+'|'+(next.id||next.title)+'|'+(next.startMin==null?'':next.startMin);}
 function nextBar(){
-  const next=nextClass(),cur=currentClass();
+  const next=nextClass(),st=nowStatus();
   const now=new Date(),todayIdx=(now.getDay()+6)%7+1,nowMin=now.getHours()*60+now.getMinutes();
-  const half=(cls,action,id,tag,title,sub,count,live,progress)=>'<div class="next-half '+cls+'"'+(action?' data-action="'+action+'" data-id="'+escapeHTML(id||'')+'" role="button" tabindex="0"':'')+'>'+
-    '<span class="next-tag"><span class="next-label">'+(live?'<span class="live-dot"></span>':'')+escapeHTML(tag)+'</span>'+(count?'<i class="next-count">'+escapeHTML(count)+'</i>':'')+'</span><strong>'+escapeHTML(title)+'</strong><small>'+escapeHTML(sub)+'</small>'+
-    (progress!=null?'<span class="next-progress" aria-hidden="true"><i style="transform:scaleX('+progress+')"></i></span>':'')+'</div>';
-  let cls='next-now',title,sub,action='',id='',count='',progress=null;
-  if(cur){
-    const from=cur.from||'',to=cur.to||'';
-    title=cur.course.name;sub=(from&&to?from+'–'+to+' · ':'')+(cur.course.room||'地点待补充');action='detail';id=cur.course.id;
-    count=countdownLabel(cur.end-nowMin,'now');progress=classProgress(cur);
+  const half=(cls,action,id,tag,title,sub,count,live,extra,total)=>'<div class="next-half '+cls+'"'+(action?' data-action="'+action+'" data-id="'+escapeHTML(id||'')+'" role="button" tabindex="0"':'')+'>'+
+    (total?'<i class="next-total">'+escapeHTML(total)+'</i>':'')+'<span class="next-tag"><span class="next-label">'+(live?'<span class="live-dot'+(live==='break'?' break':'')+'"></span>':'')+escapeHTML(tag)+'</span>'+(count?'<i class="next-count">'+escapeHTML(count)+'</i>':'')+'</span><strong>'+escapeHTML(title)+'</strong><small>'+escapeHTML(sub)+'</small>'+(extra||'')+'</div>';
+  let cls='next-now',tag='正在上',title,sub,action='',id='',count='',live='',extra='',total='';
+  if(st){
+    const c=st.course,room=c.room||'地点待补充';action='detail';id=c.id;count=statusCount(st,nowMin);total=statusTotal(st,nowMin);extra=timelineHTML(st);
+    if(st.kind==='class'){title=c.name;sub=st.from+'–'+st.to+' · '+room;live='class';}
+    else if(st.kind==='break'){cls+=' resting';tag='课间';title=c.name;sub='第 '+st.resume.p+' 节 '+st.resume.from+' 继续 · '+room;live='break';}
+    else{cls+=' resting';tag='课间';title='课间休息';sub=st.prev.name+' 已下课';live='break';}
   }else if(sample){cls+=' muted';title='示例课表';sub='示例模式下只预览样式';}
   else if(!T().semesterConfigured){cls+=' muted';title='尚未设置学期';sub='设置好开学日期后显示当前课程';}
   else{cls+=' muted';title='当前时段没有课';sub='可以休息一下';}
   const upCount=(next.day===todayIdx&&next.startMin!=null)?countdownLabel(next.startMin-nowMin,'up'):'';
-  const sig=(cur?cur.course.id+':'+cur.end:'')+'|'+(next.id||next.title)+'|'+(next.startMin==null?'':next.startMin);
-  return '<div class="next-class" data-bar="'+escapeHTML(sig)+'">'+
+  return '<div class="next-class" data-bar="'+escapeHTML(statusSig(st,next))+'">'+
     half('next-up',next.action,next.id,next.tag==='✧'?'下一堂':next.tag,next.title,next.sub,upCount)+
-    half(cls,action,id,'正在上',title,sub,count,!!cur,progress)+'</div>';
+    half(cls,action,id,tag,title,sub,count,live,extra,total)+'</div>';
 }
-// 每 20 秒刷新一次倒计时；只有“正在上 / 下一堂”真的换了才整页重绘。
+// 每 20 秒刷新一次倒计时；只有“正在上 / 课间 / 下一堂”真的换了才整页重绘。
 function tickNextBar(){
   if(tab!=='schedule')return;
   const bar=document.querySelector('.next-class');if(!bar)return;
-  const next=nextClass(),cur=currentClass();
-  const sig=(cur?cur.course.id+':'+cur.end:'')+'|'+(next.id||next.title)+'|'+(next.startMin==null?'':next.startMin);
-  if(sig!==bar.dataset.bar){const top=$('#content').scrollTop;render();$('#content').scrollTop=top;return;}
+  const next=nextClass(),st=nowStatus();
+  if(statusSig(st,next)!==bar.dataset.bar){const top=$('#content').scrollTop;render();$('#content').scrollTop=top;return;}
   const now=new Date(),todayIdx=(now.getDay()+6)%7+1,nowMin=now.getHours()*60+now.getMinutes();
   const nowEl=bar.querySelector('.next-now .next-count'),upEl=bar.querySelector('.next-up .next-count');
-  if(nowEl&&cur)nowEl.textContent=countdownLabel(cur.end-nowMin,'now');
+  if(nowEl&&st)nowEl.textContent=statusCount(st,nowMin);
+  const totalEl=bar.querySelector('.next-now .next-total');if(totalEl&&st)totalEl.textContent=statusTotal(st,nowMin);
   if(upEl&&next.day===todayIdx&&next.startMin!=null)upEl.textContent=countdownLabel(next.startMin-nowMin,'up');
-  const progressEl=bar.querySelector('.next-now .next-progress i');if(progressEl&&cur)progressEl.style.transform='scaleX('+classProgress(cur)+')';
+  const line=bar.querySelector('.next-timeline');if(line&&st)line.style.setProperty('--p',statusProgress(st));
   updateNowLine();
 }
 // 当前时刻落在第几节（按节次折算的小数，课间停在两节交界处）；不在今天的作息范围内返回 null。

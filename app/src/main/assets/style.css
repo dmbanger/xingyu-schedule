@@ -19,7 +19,7 @@
   --shadow-2:0 2px 6px rgba(30,20,70,.05),0 18px 44px rgba(40,28,90,.16);
   --blur:blur(26px) saturate(185%);
   --ios:cubic-bezier(.32,.72,0,1);--spring:cubic-bezier(.34,1.42,.64,1);--soft-spring:cubic-bezier(.3,1.22,.6,1);
-  --now:#ff3b30;--card-alpha:.88;
+  --now:#ff3b30;--rest:#f08a00;--rest-soft:rgba(255,159,10,.14);--card-alpha:.88;
   --font:-apple-system,BlinkMacSystemFont,"PingFang SC","SF Pro SC",system-ui,"MiSans","HarmonyOS Sans SC","Noto Sans CJK SC","Microsoft YaHei",sans-serif;
 }
 *{box-sizing:border-box}
@@ -120,23 +120,38 @@ dialog .button.ghost{background:var(--fill);border:0;box-shadow:none}
 .week-current:active{transform:scale(.94)}
 
 /* “下一堂 / 正在上”两栏 */
-.next-class{display:grid;grid-template-columns:1fr 1fr;padding:13px 2px 12px;border-radius:22px;background:var(--panel);border:.5px solid var(--glass-border);box-shadow:var(--shadow-1),var(--edge);margin-bottom:12px}
+.next-class{display:grid;grid-template-columns:1fr 1fr;padding:18px 2px 13px;border-radius:22px;background:var(--panel);border:.5px solid var(--glass-border);box-shadow:var(--shadow-1),var(--edge);margin-bottom:12px}
 .next-half{position:relative;display:flex;flex-direction:column;gap:3px;min-width:0;padding:0 13px;color:inherit;transition:transform .4s var(--spring),opacity .2s}
 .next-half+.next-half{border-left:.5px solid var(--line)}
 .next-half[data-action]{cursor:pointer}
 .next-half[data-action]:active{transform:scale(.96)}
-.next-half .next-tag{display:flex;align-items:center;justify-content:space-between;gap:6px;min-height:20px;font-size:11.5px;font-weight:700;letter-spacing:.06em;color:var(--accent);white-space:nowrap;overflow:hidden}
-.next-label{display:inline-flex;align-items:center;gap:6px;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.next-half .next-tag{display:flex;align-items:center;justify-content:space-between;gap:6px;min-height:20px;margin:-8px;padding:8px;font-size:11.5px;font-weight:700;letter-spacing:.06em;color:var(--accent);white-space:nowrap;overflow:hidden}
+.next-label{display:inline-flex;align-items:center;gap:6px;min-width:0;white-space:nowrap}
+.next-half .next-total{position:absolute;top:-13px;right:14px;font-style:normal;font-size:10px;font-weight:650;line-height:1;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
 .next-half .next-count{font-style:normal;font-size:11.5px;font-weight:700;letter-spacing:0;color:var(--accent);background:var(--accent-soft);padding:2px 8px;border-radius:999px;flex:none;font-variant-numeric:tabular-nums}
 .next-half strong{font-size:16px;font-weight:720;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .next-half small{font-size:12px;color:var(--muted);line-height:1.45;overflow:hidden;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical}
 .next-half.muted strong{color:var(--muted);font-weight:650}
 .next-half.muted .next-tag{color:var(--muted)}
-.next-progress{display:block;height:3px;margin-top:7px;border-radius:2px;background:var(--fill);overflow:hidden}
-.next-progress i{display:block;height:100%;border-radius:2px;background:linear-gradient(90deg,var(--accent-2),var(--accent));transform-origin:0 50%;transition:transform 1.2s var(--ios)}
-/* 正在上课时标签前的呼吸点：只动 transform/opacity，交给合成器，不会每帧重绘 */
+.next-half.resting .next-tag,.next-half.resting .next-count{color:var(--rest)}
+.next-half.resting .next-count{background:var(--rest-soft)}
+/* 时间线：每节一段实心条，课间是中间一小段橙色虚线；按真实分钟数分配宽度。
+   上面叠一层同样的分段并按进度裁切，白点标出“现在”。 */
+.next-timeline{position:relative;display:block;height:10px;margin-top:8px}
+.tl-track,.tl-fill{position:absolute;left:0;right:0;top:3px;height:4px;display:flex;align-items:center}
+.tl-seg{height:4px;border-radius:2px;background:var(--fill)}
+.tl-gap{height:0;margin:0 3px;border-top:2px dashed var(--rest);opacity:.7}
+.tl-fill{clip-path:inset(-3px calc(100% - var(--p)) -3px 0);transition:clip-path 1.2s var(--ios)}
+.tl-fill .tl-seg{background:linear-gradient(90deg,var(--accent-2),var(--accent))}
+.tl-fill .tl-gap{opacity:1;border-top-style:solid}
+.tl-gap.now{animation:gap-breathe 1.8s ease-in-out infinite}
+@keyframes gap-breathe{50%{opacity:.35}}
+.tl-dot{position:absolute;top:1px;left:var(--p);width:8px;height:8px;margin-left:-4px;border-radius:50%;background:#fff;box-shadow:0 0 0 2px var(--accent),0 1px 4px rgba(0,0,0,.2);transition:left 1.2s var(--ios)}
+.in-break .tl-dot{box-shadow:0 0 0 2px var(--rest),0 1px 4px rgba(0,0,0,.2)}
+/* 正在上课时标签前的呼吸点：只动 transform/opacity，交给合成器，不会每帧重绘；课间换成橙色 */
 .live-dot{position:relative;width:7px;height:7px;border-radius:50%;background:#34c759;flex:none}
-.live-dot::after{content:'';position:absolute;inset:0;border-radius:50%;background:#34c759;animation:live-ping 2.2s cubic-bezier(0,0,.2,1) infinite}
+.live-dot::after{content:'';position:absolute;inset:0;border-radius:50%;background:inherit;animation:live-ping 2.2s cubic-bezier(0,0,.2,1) infinite}
+.live-dot.break{background:var(--rest)}
 @keyframes live-ping{0%{transform:scale(1);opacity:.6}80%,100%{transform:scale(2.8);opacity:0}}
 
 /* 课表切换胶囊 */
@@ -248,7 +263,7 @@ dialog .button.ghost{background:var(--fill);border:0;box-shadow:none}
 
 /* ---------- 装扮页 ---------- */
 .theme-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
-.theme-option{position:relative;padding:0;border:0;border-radius:20px;background:var(--panel);color:var(--ink);overflow:hidden;text-align:left;box-shadow:var(--shadow-1),inset 0 0 0 .5px var(--glass-border);transition:transform .45s var(--spring),box-shadow .3s ease}
+.theme-option{position:relative;display:flex;flex-direction:column;justify-content:flex-start;align-items:stretch;padding:0;border:0;border-radius:20px;background:var(--panel);color:var(--ink);overflow:hidden;text-align:left;box-shadow:var(--shadow-1),inset 0 0 0 .5px var(--glass-border);transition:transform .45s var(--spring),box-shadow .3s ease}
 .theme-option:active{transform:scale(.95)}
 .theme-option.selected{box-shadow:0 0 0 2.5px var(--accent),0 10px 26px var(--accent-shadow)}
 .theme-option.selected::after{content:'';position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:50%;background:var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 12.5 4 4 8-9'/%3E%3C/svg%3E") center/13px no-repeat;box-shadow:0 2px 6px rgba(0,0,0,.2);animation:pop .55s var(--spring)}
@@ -358,7 +373,7 @@ body[data-theme=sakura]{--accent:#d2567f;--accent-2:#f48aab;--accent-soft:rgba(2
 body[data-theme=sakura] .veil{background:linear-gradient(180deg,rgba(255,246,249,.88),rgba(255,240,245,.42) 38%,rgba(255,246,249,.74))}
 
 /* ---------- 银河漫游（深色） ---------- */
-body[data-theme=night]{--accent:#b6a1ff;--accent-2:#d4c6ff;--accent-soft:rgba(182,161,255,.17);--accent-wash:rgba(182,161,255,.2);--accent-ring:rgba(182,161,255,.6);--accent-shadow:rgba(110,80,230,.38);--accent-glow:rgba(140,110,255,.34);
+body[data-theme=night]{--rest:#ffb340;--rest-soft:rgba(255,179,64,.16);--accent:#b6a1ff;--accent-2:#d4c6ff;--accent-soft:rgba(182,161,255,.17);--accent-wash:rgba(182,161,255,.2);--accent-ring:rgba(182,161,255,.6);--accent-shadow:rgba(110,80,230,.38);--accent-glow:rgba(140,110,255,.34);
   --ink:#f5f3ff;--ink-2:rgba(245,243,255,.82);--muted:rgba(222,216,245,.58);--fill:rgba(170,160,220,.14);--field-bg:rgba(170,160,220,.12);
   --panel:rgba(30,27,47,.72);--panel-solid:rgba(36,33,56,.97);--glass:rgba(44,40,66,.56);--glass-bar:rgba(24,22,38,.66);--glass-border:rgba(255,255,255,.09);
   --line:rgba(255,255,255,.08);--grid-line:rgba(255,255,255,.05);--grid-bg:rgba(16,14,30,.3);--day-bg:rgba(26,24,42,.985);
