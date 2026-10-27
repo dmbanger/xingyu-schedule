@@ -44,6 +44,7 @@ import java.util.Locale;
 /** Local timetable UI and a separate, unprivileged school browser. No third-party SDKs. */
 public final class MainActivity extends Activity {
     private static final String ORIGIN = "appassets.androidplatform.net";
+    private static final String PROJECT_URL = "https://github.com/dmbanger/xingyu-schedule";
     private static final int PICK_BACKGROUND = 10, PICK_IMPORT = 11, SAVE_BACKUP = 12;
     private WebView appView, schoolView;
     private FrameLayout root;
@@ -103,7 +104,14 @@ public final class MainActivity extends Activity {
         settings.setLoadWithOverviewMode(false);
         appView.addJavascriptInterface(new LocalBridge(), "Native");
         appView.setWebViewClient(new WebViewClient(){
-            @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) { return !isLocal(request.getUrl()); }
+            @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                Uri uri=request.getUrl();
+                if(request.isForMainFrame()&&request.hasGesture()&&PROJECT_URL.equals(uri.toString())) {
+                    try { startActivity(new Intent(Intent.ACTION_VIEW,uri)); }
+                    catch(android.content.ActivityNotFoundException e) { message("没有找到可打开链接的浏览器"); }
+                }
+                return !isLocal(uri);
+            }
             @Override public void onPageFinished(WebView view, String url) { pushedInsets=""; pushInsets(); }
             @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                 Uri uri=request.getUrl();
