@@ -102,7 +102,7 @@ public final class MainActivity extends Activity {
         appView.addJavascriptInterface(new LocalBridge(), "Native");
         appView.setWebViewClient(new WebViewClient(){
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) { return !isLocal(request.getUrl()); }
-            @Override public void onPageFinished(WebView view, String url) { pushInsets(); }
+            @Override public void onPageFinished(WebView view, String url) { pushedInsets=""; pushInsets(); }
             @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                 Uri uri=request.getUrl();
                 if(!isLocal(uri))return response("text/plain",new byte[0]);
@@ -124,7 +124,9 @@ public final class MainActivity extends Activity {
     private void notifyJs(String function,String value){appView.evaluateJavascript("window."+function+"&&window."+function+"("+JSONObject.quote(value)+")",null);}
     private void message(String s){Toast.makeText(this,s,Toast.LENGTH_LONG).show();}
     private String insetsText(){float d=getResources().getDisplayMetrics().density;return Math.round(insetTop/d)+","+Math.round(insetBottom/d);}
-    private void pushInsets(){if(appView!=null)appView.evaluateJavascript("window.applyInsets&&window.applyInsets('"+insetsText()+"')",null);}
+    private String pushedInsets="";
+    // 只有系统栏高度真的变了才通知网页；换状态栏图标颜色等也会触发 insets 回调，不必每次都让页面重算样式。
+    private void pushInsets(){if(appView==null)return;String text=insetsText();if(text.equals(pushedInsets))return;pushedInsets=text;appView.evaluateJavascript("window.applyInsets&&window.applyInsets('"+text+"')",null);}
     private void setDarkBars(boolean dark){setDarkBars(dark,dark);}
     /** dark=true 表示背景是深色，系统栏图标用白色。弹层打开时页面顶部变暗，只把状态栏换成白色图标。 */
     private void setDarkBars(boolean statusDark,boolean navDark){

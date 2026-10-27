@@ -7,7 +7,7 @@ const EASE_IOS='cubic-bezier(.32,.72,0,1)',EASE_SPRING='cubic-bezier(.34,1.42,.6
 // 轻触反馈交给原生振动；浏览器预览里没有 Native，直接忽略。
 function haptic(kind){try{if(N&&N.haptic)N.haptic(kind||'tick');}catch(_){}}
 // 原生层把状态栏、手势条高度（CSS 像素）传进来，页面自己留白，壁纸就能铺满全屏。
-window.applyInsets=text=>{const [top,bottom]=String(text||'').split(',').map(Number),root=document.documentElement.style;if(isFinite(top))root.setProperty('--safe-top',top+'px');if(isFinite(bottom))root.setProperty('--safe-bottom',bottom+'px');};
+window.applyInsets=text=>{const [top,bottom]=String(text||'').split(',').map(Number),root=document.documentElement.style;if(isFinite(top)&&root.getPropertyValue('--safe-top')!==top+'px')root.setProperty('--safe-top',top+'px');if(isFinite(bottom)&&root.getPropertyValue('--safe-bottom')!==bottom+'px')root.setProperty('--safe-bottom',bottom+'px');};
 try{if(N&&N.insets)window.applyInsets(N.insets());}catch(_){}
 const icon=name=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(icons[name]||icons.star)+'</svg>';
 let state=C.defaultState(),tab='schedule',sample=false,viewWeek=1,toastTimer,pendingImport=null,courseColor='lavender',undoAvailable=false,suppressCourseClickUntil=0;
@@ -447,8 +447,17 @@ function bindView(){
 // 换主题的圆形展开边缘带一圈新主题色的光。星屿暮色和樱花来信都是浅色，只靠裁切几乎看不出变化，
 // 有了这道光波才看得清新主题正从哪里铺开。光圈加在新页面里（View Transition 的新画面是实时的），
 // 和裁切圆同步放大，外沿正好被裁掉，只留下向内的一圈。
+// 换主题的圆形展开边缘带一圈新主题色的光。星屿暮色和樱花来信都是浅色，只靠裁切几乎看不出变化，
+// 有了这道光波才看得清新主题正从哪里铺开。光圈加在新页面里（View Transition 的新画面是实时的），
+// 和裁切圆同步放大，外沿正好被裁掉，只留下向内的一圈。
+// 光圈只在一张 256×256 的小 canvas 上画一次，再交给合成器整体放大：画布是现成的纹理，放大不用重新光栅化。
+// 以前直接用和屏幕对角线一样大的渐变元素，手机上一次要光栅化上百块图块。柔和的光放大后看不出糊。
 function themeWave(x,y,radius,duration,easing){
-  const wave=document.createElement('div');wave.className='theme-wave';wave.setAttribute('aria-hidden','true');
+  const wave=document.createElement('canvas'),ctx=wave.getContext('2d'),size=256;if(!ctx)return;
+  wave.width=wave.height=size;wave.className='theme-wave';wave.setAttribute('aria-hidden','true');
+  const css=getComputedStyle(document.body),c=size/2,g=ctx.createRadialGradient(c,c,0,c,c,c);
+  [[0,'transparent'],[.64,'transparent'],[.8,css.getPropertyValue('--accent-wash')],[.92,css.getPropertyValue('--accent-glow')],[.985,css.getPropertyValue('--accent-ring')],[1,'transparent']].forEach(([o,v])=>g.addColorStop(o,v.trim()||'transparent'));
+  ctx.fillStyle=g;ctx.fillRect(0,0,size,size);
   Object.assign(wave.style,{left:(x-radius)+'px',top:(y-radius)+'px',width:radius*2+'px',height:radius*2+'px'});
   document.body.appendChild(wave);
   wave.animate([{transform:'scale(0)'},{transform:'scale(1)'}],{duration,easing,fill:'forwards'});
@@ -467,7 +476,7 @@ function showSheet(title,html){
   if(wasClosing)sheet.close();
   const swap=sheet.open;
   $('#sheet-title').textContent=title;$('#sheet-body').innerHTML=html;
-  document.documentElement.classList.add('sheet-open');syncSystemBars();
+  document.documentElement.classList.add('sheet-open','sheet-lowfx');syncSystemBars();
   if(!sheet.open){
     sheet.showModal();
     if(animate){sheet.animate([{transform:'translateY(100%)'},{transform:'translateY(0)'}],{duration:540,easing:EASE_IOS});try{sheet.animate([{opacity:0},{opacity:1}],{duration:380,easing:'ease-out',pseudoElement:'::backdrop'});}catch(_){}}
@@ -477,7 +486,7 @@ function showSheet(title,html){
 function closeSheet(){
   const sheet=$('#sheet');if(!sheetActive())return;
   document.documentElement.classList.remove('sheet-open');syncSystemBars();
-  if(reducedMotion()||!sheet.animate){sheet.style.transform='';sheet.close();return;}
+  if(reducedMotion()||!sheet.animate){sheet.style.transform='';sheet.close();document.documentElement.classList.remove('sheet-lowfx');return;}
   // 换成非模态再播放滑出：模态弹层会让整页 inert，滑走的 0.4 秒里点不动、划不动。
   // 非模态没有 ::backdrop，暗色遮罩改由 html.sheet-fading 的伪元素淡出。
   const from=sheet.style.transform||'translateY(0)',scroll=sheet.scrollTop;
@@ -486,7 +495,7 @@ function closeSheet(){
   document.documentElement.classList.add('sheet-fading');
   const motion=[sheet.animate([{transform:from},{transform:'translateY(100%)'}],{duration:400,easing:EASE_IOS,fill:'forwards'})];
   sheetMotion=motion;
-  motion[0].finished.then(()=>{if(sheetMotion!==motion)return;sheetMotion=null;sheet.classList.remove('closing');document.documentElement.classList.remove('sheet-fading');sheet.style.transform='';sheet.close();motion.forEach(a=>a.cancel());}).catch(()=>{});
+  motion[0].finished.then(()=>{if(sheetMotion!==motion)return;sheetMotion=null;sheet.classList.remove('closing');document.documentElement.classList.remove('sheet-fading','sheet-lowfx');sheet.style.transform='';sheet.close();motion.forEach(a=>a.cancel());}).catch(()=>{});
 }
 function detail(id){const c=visibleCourses().find(c=>c.id===id);if(!c)return;showSheet(sample?'示例课程':'课程详情','<span class="badge">'+(sample?'示例 · 不会保存':'已保存到本机')+'</span><h3 class="detail-title">'+escapeHTML(c.name)+'</h3>'+[['时间','周'+['','一','二','三','四','五','六','日'][c.day]+' · 第 '+c.start+'–'+c.end+' 节'],['周次',C.weekLabel(c.weeks)+' 周'],['地点',c.room||'未填写'],['教师',c.teacher||'未填写']].map(([a,b])=>'<div class="detail-item"><span>'+a+'</span><span>'+escapeHTML(b)+'</span></div>').join('')+(c.note?'<p class="detail-note">'+escapeHTML(c.note)+'</p>':'')+(!sample?'<div class="button-group" style="margin-top:24px"><button class="button secondary" data-action="edit" data-id="'+escapeHTML(c.id)+'">编辑课程</button><button class="button danger" data-action="delete" data-id="'+escapeHTML(c.id)+'">删除</button></div>':''));}
 function courseForm(id){if(sample){toast('请退出示例模式后再编辑自己的课表');return;}const c=T().courses.find(c=>c.id===id)||{name:'',teacher:'',room:'',day:1,start:1,end:2,weeks:'1-'+T().totalWeeks,color:'lavender',note:''};courseColor=c.color;
@@ -545,11 +554,14 @@ const actions={
   'prev-week':()=>changeWeek(-1),'next-week':()=>changeWeek(1),'week-picker':showWeekPicker,'set-week':b=>{const next=+b.dataset.week;closeSheet();navigateToWeek(next);},'this-week':()=>{closeSheet();jumpToToday();},
   demo:()=>{sample=true;viewWeek=Math.max(1,Math.min(T().totalWeeks,currentWeek()));render();},'exit-demo':()=>{sample=false;render();},'theme-demo':()=>{sample=true;go('schedule');},theme:b=>{
     const next=b.dataset.theme;if(next===state.settings.theme)return;haptic('confirm');
-    const apply=()=>{if(updateSettings({theme:next}))render();};
+    // 主题都在变量层切换，装扮页本身只需改选中的那张卡片，不用整页重建
+    const apply=()=>{document.documentElement.classList.add('theme-switching');if(updateSettings({theme:next}))document.querySelectorAll('.theme-option').forEach(o=>{const on=o.dataset.theme===next;o.classList.toggle('selected',on);o.setAttribute('aria-pressed',on);});};
     if(reducedMotion()||!document.startViewTransition){apply();return;}
     // 新主题从点到的那张卡片处圆形展开
     const r=b.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2,radius=Math.hypot(Math.max(x,innerWidth-x),Math.max(y,innerHeight-y)),duration=900,easing='cubic-bezier(.45,.05,.25,1)';
-    document.startViewTransition(apply).ready.then(()=>{
+    const vt=document.startViewTransition(apply);
+    const done=()=>document.documentElement.classList.remove('theme-switching');vt.finished.then(done,done);
+    vt.ready.then(()=>{
       document.documentElement.animate({clipPath:['circle(0px at '+x+'px '+y+'px)','circle('+radius+'px at '+x+'px '+y+'px)']},{duration,easing,pseudoElement:'::view-transition-new(root)'});
       themeWave(x,y,radius,duration,easing);
     }).catch(()=>{});
@@ -610,7 +622,7 @@ $('#browser-import').onchange=async e=>{const file=e.target.files[0];if(file){if
 $('#browser-background').onchange=e=>{const file=e.target.files[0];if(!file)return;if(file.size>4*1024*1024){toast('浏览器预览请选择小于 4 MB 的图片');return;}const reader=new FileReader();reader.onload=()=>{try{localStorage.setItem('xingyu-wallpaper',reader.result);window.receiveBackground();}catch(_){toast('浏览器存储空间不足');}};reader.readAsDataURL(file);e.target.value='';};
 $('#sheet').addEventListener('cancel',e=>{e.preventDefault();closeSheet();});
 // 不论弹层以什么方式关掉，背后的页面都要恢复原样。
-$('#sheet').addEventListener('close',()=>{if(!$('#sheet').open&&document.documentElement.classList.contains('sheet-open')){document.documentElement.classList.remove('sheet-open');syncSystemBars();}});
+$('#sheet').addEventListener('close',()=>{if($('#sheet').open)return;document.documentElement.classList.remove('sheet-lowfx');if(document.documentElement.classList.contains('sheet-open')){document.documentElement.classList.remove('sheet-open');syncSystemBars();}});
 // 按住弹层顶部往下拖可以关闭；拖得不够远或不够快就弹回去。
 (()=>{
   const sheet=$('#sheet'),head=sheet.querySelector('.sheet-head');let drag=null;
