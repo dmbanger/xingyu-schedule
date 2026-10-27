@@ -44,9 +44,9 @@ svg{flex:none}
 #app{position:relative;height:100%;max-width:1080px;margin:auto;overflow:hidden;transform-origin:50% 0;will-change:transform;transition:transform .55s var(--ios)}
 
 /* 弹层打开时，后面的整页像 iOS 一样微微缩小、圆角下沉 */
-html.sheet-open body{background:#07060c}
+html.sheet-open body,html.sheet-settling body{background:#07060c}
 html.sheet-open #scene,html.sheet-open #app{transform:translateY(calc(var(--safe-top) * .5 + 8px)) scale(.935)}
-html.sheet-open #scene{border-radius:24px}
+html.sheet-open #scene,html.sheet-settling #scene{border-radius:24px}
 /* 弹层开着时后面的页面压暗了，看不出毛玻璃；关掉模糊，缩放动画就不用每帧重算这些模糊层。弹层收起后再恢复。 */
 html.sheet-lowfx .app-header::before,html.sheet-lowfx #navigation,html.sheet-lowfx .header-add,html.sheet-lowfx .panel,html.sheet-lowfx .import-hero,html.sheet-lowfx .empty-schedule{-webkit-backdrop-filter:none;backdrop-filter:none}
 html.sheet-lowfx .app-header::before{opacity:0}

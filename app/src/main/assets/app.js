@@ -555,7 +555,15 @@ function stepMeteors(now){
   else{sky.raf=0;sky.canvas.remove();sky.canvas=null;sky.ctx=null;}
 }
 // 系统栏图标颜色：深色主题，或弹层打开、页面顶部压暗时，状态栏用白色图标。
-function syncSystemBars(){try{if(N&&N.systemBars)N.systemBars(state.settings.theme==='night',document.documentElement.classList.contains('sheet-open'));}catch(_){}}
+function syncSystemBars(){const c=document.documentElement.classList;try{if(N&&N.systemBars)N.systemBars(state.settings.theme==='night',c.contains('sheet-open')||c.contains('sheet-settling'));}catch(_){}}
+// 弹层收起后，背后的页面要 0.55 秒才缩回原样。这段时间里露出的边缘保持深色、圆角和白色状态栏图标，
+// 等缩放结束再换回来；以前一收起就换成浅色底，四周会闪一下白边。
+let settleTimer=0;
+function leaveSheetMode(){
+  const c=document.documentElement.classList;if(!c.contains('sheet-open'))return;
+  c.remove('sheet-open');c.add('sheet-settling');clearTimeout(settleTimer);
+  settleTimer=setTimeout(()=>{c.remove('sheet-settling');syncSystemBars();},reducedMotion()?0:600);
+}
 // 弹层从底部滑出，背后的页面同时缩小下沉；关闭时先滑下去再真正 close()。
 let sheetMotion=null;
 // 正在滑走的弹层已经算关闭：后面的页面这时就能滑动、点按。
@@ -567,6 +575,7 @@ function showSheet(title,html){
   if(wasClosing)sheet.close();
   const swap=sheet.open;
   $('#sheet-title').textContent=title;$('#sheet-body').innerHTML=html;
+  clearTimeout(settleTimer);document.documentElement.classList.remove('sheet-settling');
   document.documentElement.classList.add('sheet-open','sheet-lowfx');syncSystemBars();
   if(!sheet.open){
     sheet.showModal();
@@ -576,7 +585,7 @@ function showSheet(title,html){
 }
 function closeSheet(){
   const sheet=$('#sheet');if(!sheetActive())return;
-  document.documentElement.classList.remove('sheet-open');syncSystemBars();
+  leaveSheetMode();
   if(reducedMotion()||!sheet.animate){sheet.style.transform='';sheet.close();document.documentElement.classList.remove('sheet-lowfx');return;}
   // 换成非模态再播放滑出：模态弹层会让整页 inert，滑走的 0.4 秒里点不动、划不动。
   // 非模态没有 ::backdrop，暗色遮罩改由 html.sheet-fading 的伪元素淡出。
@@ -725,7 +734,7 @@ $('#browser-import').onchange=async e=>{const file=e.target.files[0];if(file){if
 $('#browser-background').onchange=e=>{const file=e.target.files[0];if(!file)return;if(file.size>4*1024*1024){toast('浏览器预览请选择小于 4 MB 的图片');return;}const reader=new FileReader();reader.onload=()=>{try{localStorage.setItem('xingyu-wallpaper',reader.result);window.receiveBackground();}catch(_){toast('浏览器存储空间不足');}};reader.readAsDataURL(file);e.target.value='';};
 $('#sheet').addEventListener('cancel',e=>{e.preventDefault();closeSheet();});
 // 不论弹层以什么方式关掉，背后的页面都要恢复原样。
-$('#sheet').addEventListener('close',()=>{if($('#sheet').open)return;document.documentElement.classList.remove('sheet-lowfx');if(document.documentElement.classList.contains('sheet-open')){document.documentElement.classList.remove('sheet-open');syncSystemBars();}});
+$('#sheet').addEventListener('close',()=>{if($('#sheet').open)return;document.documentElement.classList.remove('sheet-lowfx');leaveSheetMode();});
 // 按住弹层顶部往下拖可以关闭；拖得不够远或不够快就弹回去。
 (()=>{
   const sheet=$('#sheet'),head=sheet.querySelector('.sheet-head');let drag=null;

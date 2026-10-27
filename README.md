@@ -13,7 +13,7 @@
 - **更新日志**：[CHANGELOG.md](CHANGELOG.md)
 - **验证记录**：[VALIDATION.md](VALIDATION.md)
 
-当前版本 0.4.9。支持 Android 8.0 及以上。
+当前版本 0.4.10。支持 Android 8.0 及以上。
 
 ## 亮点
 
