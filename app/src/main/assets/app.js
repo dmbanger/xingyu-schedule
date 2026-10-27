@@ -430,8 +430,9 @@ function renderTimetable(week){
   html+='</div>';return html;
 }
 function renderImport(){return '<p class="eyebrow">A NEW SEMESTER</p><h1 class="page-title">装进一整个学期</h1><p class="subtitle">一次导入，每天安心出发。</p><div id="import-error"></div>'+(window.__rawSnapshot?'<button class="text-button" data-action="export-snapshot" style="margin:0 0 12px">导出上次识别的页面结构（用于适配）</button>':'')+'<div class="import-layout"><section class="import-hero"><div class="hero-icon">'+icon('school')+'</div><span class="badge">'+escapeHTML(C.schoolPreset(state.settings.schoolPreset).badge)+'</span><h2 style="margin-top:13px">从学校教务导入</h2><p>在学校官方页面登录，打开整学期个人课表，再识别并核对课程。账号和密码由你在学校页面输入。</p><div class="steps"><div class="step"><b>01 / 登录</b>学校教务网站</div><div class="step"><b>02 / 识别</b>整学期课表</div><div class="step"><b>03 / 核对</b>保存到本机</div></div><form id="school-form"><label class="field"><span>学校与教务系统</span><select id="school-preset">'+C.SCHOOL_PRESETS.map(p=>'<option value="'+p.id+'" '+(state.settings.schoolPreset===p.id?'selected':'')+'>'+escapeHTML(p.label)+'</option>').join('')+'</select></label><label class="field"><span>教务入口网址</span><input id="school-url" type="url" required maxlength="500" value="'+escapeHTML(state.settings.schoolUrl)+'" placeholder="https://学校教务网址"></label><button class="button full" type="submit">'+icon('school')+'打开学校网站</button></form><p class="hint">'+escapeHTML(C.schoolPreset(state.settings.schoolPreset).hint)+' 浏览器默认开启桌面模式，顶部按钮可切回手机模式；如需校园网，请先连接学校 VPN。</p></section><div><section class="panel"><div class="row"><span class="file-icon">'+icon('file')+'</span><div style="flex:1"><h3>从文件导入</h3><p>星屿 JSON 备份、CSV 或课表 HTML</p></div></div><p>没有网络也可以恢复备份。文件识别后会展示课程预览，不会立即覆盖现有课表。</p><button class="button secondary full" data-action="import-file">选择课表文件</button><button class="text-button" data-action="csv-help" style="margin-top:10px">查看 CSV 格式说明 →</button></section><section class="panel"><div class="row"><span class="file-icon">'+icon('plus')+'</span><div style="flex:1"><h3>手动添加课程</h3><p>支持单双周、不连续周次和跨节课程</p></div></div><p>识别不了的课程，也可以自己补齐。</p><button class="button ghost full" data-action="add">添加一门课</button></section></div></div>';}
-function renderTheme(){return '<p class="eyebrow">YOUR LITTLE UNIVERSE</p><h1 class="page-title">让课表，也心动</h1><p class="subtitle">换一种颜色，收集一点上课的好心情。</p><div class="theme-layout"><div><div class="section-title">主题色调 <small>全部本地使用</small></div><div class="theme-options">'+[['starlight','星屿暮色','柔紫 · 像黄昏一样温柔'],['sakura','樱花来信','浅粉 · 轻轻落在这一页'],['night','银河漫游','深色 · 留一片星空']].map(([id,name,desc])=>'<button class="theme-option '+id+' '+(state.settings.theme===id?'selected':'')+'" data-action="theme" data-theme="'+id+'" aria-pressed="'+(state.settings.theme===id)+'"><div class="theme-sample"><div class="sample-grid"><i></i><i></i><i></i><i></i></div></div><strong>'+name+'</strong><small>'+desc+'</small></button>').join('')+'</div><section class="panel" style="margin-top:22px"><div class="row"><h3>课程卡片不透明度</h3><span class="badge" id="opacity-value">'+state.settings.cardOpacity+'%</span></div><label class="field"><input aria-label="课程卡片不透明度" type="range" id="card-opacity" min="35" max="100" value="'+state.settings.cardOpacity+'" style="--p:'+((state.settings.cardOpacity-35)/65*100).toFixed(1)+'%"></label><p class="hint">数值越大，文字越清晰；数值越小，背景越通透。</p></section><section class="panel"><div class="row"><h3>背景通透度</h3><span class="badge" id="clarity-value">'+state.settings.wallpaperClarity+'%</span></div><label class="field"><input aria-label="背景通透度" type="range" id="wallpaper-clarity" min="0" max="100" value="'+state.settings.wallpaperClarity+'" style="--p:'+state.settings.wallpaperClarity+'%"></label><p class="hint">数值越大，背景图片越清晰、颜色越饱满；数值越小，柔光越多、文字越醒目。浅色图片可以调高一些。</p></section><button class="button ghost full" data-action="theme-demo">'+icon('calendar')+'用示例课程预览</button></div><section class="panel"><div class="row"><h3>自定义背景</h3><span class="badge">自选图片</span></div><div class="wallpaper-preview" id="wallpaper-preview"></div><p>可从手机中选择喜欢的图片，图片仅在本地保存。</p><div class="button-group"><button class="button secondary" data-action="pick-background">'+icon('image')+'选择图片</button><button class="button ghost" data-action="builtin-background">恢复预置</button></div><button class="text-button" data-action="none-background" style="margin-top:13px">使用纯色背景</button><p class="hint">手机系统可能会自动调整相册图片方向。如背景方向不合适，请先在相册旋转后保存。</p></section></div>';}
+function renderTheme(){return '<p class="eyebrow">YOUR LITTLE UNIVERSE</p><h1 class="page-title">让课表，也心动</h1><p class="subtitle">换一种颜色，收集一点上课的好心情。</p><div class="theme-layout"><div><div class="section-title">主题色调 <small>全部本地使用</small></div><div class="theme-options">'+[['starlight','星屿暮色','柔紫 · 像黄昏一样温柔'],['sakura','樱花来信','浅粉 · 轻轻落在这一页'],['night','银河漫游','深色 · 留一片星空']].map(([id,name,desc])=>'<button class="theme-option '+id+' '+(state.settings.theme===id?'selected':'')+'" data-action="theme" data-theme="'+id+'" aria-pressed="'+(state.settings.theme===id)+'"><div class="theme-sample"><div class="sample-grid"><i></i><i></i><i></i><i></i></div></div><strong>'+name+'</strong><small>'+desc+'</small></button>').join('')+'</div><section class="panel" style="margin-top:22px"><div class="row"><h3>课程卡片不透明度</h3><span class="badge" id="opacity-value">'+state.settings.cardOpacity+'%</span></div><div class="field slider" data-slider><input aria-label="课程卡片不透明度" type="range" id="card-opacity" min="35" max="100" value="'+state.settings.cardOpacity+'" style="--p:'+((state.settings.cardOpacity-35)/65*100).toFixed(1)+'%"></div><p class="hint">数值越大，文字越清晰；数值越小，背景越通透。</p></section><section class="panel"><div class="row"><h3>背景通透度</h3><span class="badge" id="clarity-value">'+state.settings.wallpaperClarity+'%</span></div><div class="field slider" data-slider><input aria-label="背景通透度" type="range" id="wallpaper-clarity" min="0" max="100" value="'+state.settings.wallpaperClarity+'" style="--p:'+state.settings.wallpaperClarity+'%"></div><p class="hint">数值越大，背景图片越清晰、颜色越饱满；数值越小，柔光越多、文字越醒目。浅色图片可以调高一些。</p></section><button class="button ghost full" data-action="theme-demo">'+icon('calendar')+'用示例课程预览</button></div><section class="panel"><div class="row"><h3>自定义背景</h3><span class="badge">自选图片</span></div><div class="wallpaper-preview" id="wallpaper-preview"></div><p>可从手机中选择喜欢的图片，图片仅在本地保存。</p><div class="button-group"><button class="button secondary" data-action="pick-background">'+icon('image')+'选择图片</button><button class="button ghost" data-action="builtin-background">恢复预置</button></div><button class="text-button" data-action="none-background" style="margin-top:13px">使用纯色背景</button><p class="hint">手机系统可能会自动调整相册图片方向。如背景方向不合适，请先在相册旋转后保存。</p></section></div>';}
 // 设置页按 iOS 分组列表排：左侧彩色图标，右侧操作。
+let starLit=false;try{starLit=localStorage.getItem('xingyu-star-lit')==='1';}catch(_){}
 const settingRow=(ico,tint,title,sub,action)=>'<div class="setting-row"><span class="row-icon tint-'+tint+'">'+icon(ico)+'</span><div><strong>'+title+'</strong><small>'+sub+'</small></div>'+action+'</div>';
 function renderSettings(){const s=T();return '<p class="eyebrow">JUST YOUR TIMETABLE</p><h1 class="page-title">刚刚好的设置</h1><p class="subtitle">只留下课表需要的东西。</p><section class="panel list">'+
   settingRow('calendar','orange','学期与作息',(s.semesterConfigured?'开学日期 '+escapeHTML(s.semesterStart)+' · '+s.totalWeeks+' 周':'请设置本学期第一周的周一')+'<br>'+s.periods+' 节 / 天 · 当前使用'+(s.semesterConfigured?'自定':'示例')+'作息，请按校区校准','<button class="button secondary small" data-action="semester">编辑</button>')+
@@ -443,8 +444,31 @@ function renderSettings(){const s=T();return '<p class="eyebrow">JUST YOUR TIMET
   settingRow('download','teal','恢复备份 / 导入文件','确认预览后才会保存','<button class="text-button" data-action="import-file">选择文件</button>')+
   (undoAvailable?settingRow('undo','gray','撤销最近一次导入','恢复覆盖之前的课程与设置','<button class="text-button" data-action="undo-import">恢复</button>'):'')+
   settingRow('lock','red','清除教务登录状态','退出本应用内学校网站的登录','<button class="text-button" data-action="clear-session">清除</button>')+
-  '</section><section class="panel"><div class="row"><span class="file-icon">'+icon('star')+'</span><div style="flex:1"><h3>一个安静的课表</h3><p>无广告 · 无会员 · 无商城</p></div></div><p>课程保存在本机。应用不含广告、统计、支付或账号服务。只有你打开学校网站时，才需要网络连接。</p><button class="text-button" data-action="about">关于星屿课表与导入适配 →</button></section><div class="settings-footer"><div class="footer-star">✦</div>星屿课表 v'+escapeHTML(window.AppVersion||'')+'<br>愿每一个平常日，都有小小的期待<br><span class="footer-sign">创作者 · 暗物质鞭炮</span></div>';}
+  '</section><section class="panel"><div class="row"><button class="file-icon star-toggle'+(starLit?' lit':'')+'" data-action="star-lit" aria-pressed="'+starLit+'" aria-label="点亮星星">'+icon('star')+'</button><div style="flex:1"><h3>一个安静的课表</h3><p>无广告 · 无会员 · 无商城</p></div></div><p>课程保存在本机。应用不含广告、统计、支付或账号服务。只有你打开学校网站时，才需要网络连接。</p><button class="text-button" data-action="about">关于星屿课表与导入适配 →</button></section><div class="settings-footer"><button class="footer-star" data-action="meteor" aria-label="放一颗流星">✦</button>星屿课表 v'+escapeHTML(window.AppVersion||'')+'<br>愿每一个平常日，都有小小的期待<br><span class="footer-sign">创作者 · 暗物质鞭炮</span></div>';}
+// 防误触滑块：只有按住圆钮才能拖动；点在轨道上、或从轨道上划过去滚动页面，都不会改数值。
+// 原生滑块不接收触摸（pointer-events:none），由外层判断按下的位置是否落在圆钮附近；键盘仍可直接调节。
+function bindSafeSlider(input){
+  const box=input.parentElement,min=Number(input.min),max=Number(input.max),thumb=28;let drag=null;
+  const thumbX=r=>r.left+thumb/2+(Number(input.value)-min)/(max-min)*(r.width-thumb);
+  box.addEventListener('pointerdown',e=>{
+    const r=input.getBoundingClientRect(),x=thumbX(r);
+    if(Math.abs(e.clientX-x)>26||Math.abs(e.clientY-(r.top+r.height/2))>26)return;
+    drag={id:e.pointerId,offset:e.clientX-x,step:Math.floor(Number(input.value)/10)};
+    try{box.setPointerCapture(e.pointerId);}catch(_){}
+    box.classList.add('dragging');haptic('tick');
+  });
+  box.addEventListener('pointermove',e=>{
+    if(!drag||e.pointerId!==drag.id)return;
+    const r=input.getBoundingClientRect(),ratio=Math.max(0,Math.min(1,(e.clientX-drag.offset-r.left-thumb/2)/(r.width-thumb))),v=Math.round(min+ratio*(max-min));
+    if(v===Number(input.value))return;
+    input.value=v;input.dispatchEvent(new Event('input'));
+    const step=Math.floor(v/10);if(step!==drag.step){drag.step=step;haptic('soft');}
+  });
+  const end=e=>{if(!drag||e.pointerId!==drag.id)return;drag=null;box.classList.remove('dragging');input.dispatchEvent(new Event('change'));};
+  box.addEventListener('pointerup',end);box.addEventListener('pointercancel',end);
+}
 function bindView(){
+  document.querySelectorAll('[data-slider] input[type=range]').forEach(bindSafeSlider);
   if(tab==='schedule')bindWeekSwipe();
   const school=$('#school-form');if(school)school.onsubmit=e=>{e.preventDefault();const url=$('#school-url').value.trim();try{const u=new URL(url);if(!['https:','http:'].includes(u.protocol)||u.username||u.password)throw 0;}catch(_){toast('请输入完整的学校教务网址');return;}if(!updateSettings({schoolUrl:url}))return;if(N)N.openSchool(url);else toast('教务网站导入请使用安卓安装包。浏览器预览支持文件导入。');};
   const preset=$('#school-preset');if(preset)preset.onchange=()=>{const p=C.schoolPreset(preset.value);if(updateSettings({schoolPreset:p.id,...(p.url?{schoolUrl:p.url}:{})}))render();};
@@ -471,6 +495,64 @@ function themeWave(x,y,radius,duration,easing){
   document.body.appendChild(wave);
   wave.animate([{transform:'scale(0)'},{transform:'scale(1)'}],{duration,easing,fill:'forwards'});
   wave.animate([{opacity:1},{opacity:1,offset:.5},{opacity:0}],{duration:duration+240,fill:'forwards'}).finished.then(()=>wave.remove(),()=>wave.remove());
+}
+// 星星点亮时向四周迸出一圈金色星屑
+function starBurst(el){
+  if(reducedMotion()||!el.animate)return;
+  const r=el.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
+  for(let i=0;i<14;i++){
+    const p=document.createElement('i'),a=Math.PI*2*i/14+Math.random()*.4,d=34+Math.random()*30,size=3+Math.random()*4;
+    p.className='star-spark';Object.assign(p.style,{left:cx-size/2+'px',top:cy-size/2+'px',width:size+'px',height:size+'px'});document.body.appendChild(p);
+    p.animate([{transform:'translate(0,0) scale(1)',opacity:1},{transform:'translate('+Math.cos(a)*d+'px,'+Math.sin(a)*d+'px) scale(.2)',opacity:0}],{duration:620+Math.random()*260,easing:'cubic-bezier(.2,.8,.3,1)',fill:'forwards'}).finished.then(()=>p.remove(),()=>p.remove());
+  }
+}
+// 流星：每点一次底部星星，从它的位置向上抛出一颗，沿随机抛物线飞行，带渐细的彗尾、十字星芒和沿途星屑，
+// 落下前在空中散成一小簇星光。全部画在一张全屏 canvas 上，没有流星时停止绘制并移除画布。
+const meteorSky={canvas:null,ctx:null,items:[],sparks:[],raf:0,last:0,dpr:1};
+// 深色主题用发光叠加的浅色；浅色主题上浅色几乎看不见，改用饱和色正常叠加
+const METEOR_COLORS={dark:['255,214,120','196,176,255','150,210,255','255,172,214','255,255,255'],light:['124,92,255','255,128,48','255,72,140','40,150,255','245,170,0']};
+function launchMeteor(from){
+  if(reducedMotion())return;
+  const sky=meteorSky;
+  if(!sky.canvas){const c=document.createElement('canvas');c.className='meteor-sky';c.setAttribute('aria-hidden','true');document.body.appendChild(c);sky.canvas=c;sky.ctx=c.getContext('2d');if(!sky.ctx){c.remove();sky.canvas=null;return;}}
+  const dpr=Math.min(2,window.devicePixelRatio||1),w=Math.round(innerWidth*dpr),h=Math.round(innerHeight*dpr);
+  if(sky.canvas.width!==w||sky.canvas.height!==h){sky.canvas.width=w;sky.canvas.height=h;}sky.dpr=dpr;
+  const r=from.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2,g=1300+Math.random()*500;
+  const rise=Math.max(160,Math.min(y-60,220+Math.random()*420)),vy=-Math.sqrt(2*g*rise),vx=(Math.random()*2-1)*(120+Math.random()*220);
+  const palette=METEOR_COLORS[state.settings.theme==='night'?'dark':'light'],color=palette[Math.floor(Math.random()*palette.length)];
+  sky.glow=state.settings.theme==='night';
+  sky.items.push({x,y,vx,vy,g,age:0,life:.9+Math.random()*.7,trail:[],color,size:3+Math.random()*2,spin:Math.random()*Math.PI});
+  // 出手时在星星处先迸一小团星屑
+  for(let i=0;i<10;i++){const a=-Math.PI/2+(Math.random()-.5)*2.2,v=60+Math.random()*140;sky.sparks.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,color:i%2?color:'255,255,255',life:.35+Math.random()*.35,size:.8+Math.random()*1.4,age:0});}
+  if(!sky.raf){sky.last=performance.now();sky.raf=requestAnimationFrame(stepMeteors);}
+}
+function stepMeteors(now){
+  const sky=meteorSky,ctx=sky.ctx,dt=Math.min(.034,(now-sky.last)/1000),W=innerWidth,H=innerHeight;sky.last=now;
+  ctx.setTransform(sky.dpr,0,0,sky.dpr,0,0);ctx.clearRect(0,0,W,H);ctx.globalCompositeOperation=sky.glow?'lighter':'source-over';ctx.lineCap='round';
+  const sparkle=(x,y,vx,vy,color,life,size)=>sky.sparks.push({x,y,vx,vy,color,life,size,age:0});
+  sky.items=sky.items.filter(m=>{
+    m.age+=dt;m.vy+=m.g*dt;m.x+=m.vx*dt;m.y+=m.vy*dt;m.spin+=dt*4;
+    m.trail.push([m.x,m.y]);if(m.trail.length>30)m.trail.shift();
+    const fade=Math.max(0,Math.min(1,(m.life-m.age)/(m.life*.35)));
+    for(let i=1;i<m.trail.length;i++){const k=i/m.trail.length;ctx.strokeStyle='rgba('+m.color+','+(k*k*.85*fade)+')';ctx.lineWidth=m.size*2.6*k;ctx.beginPath();ctx.moveTo(m.trail[i-1][0],m.trail[i-1][1]);ctx.lineTo(m.trail[i][0],m.trail[i][1]);ctx.stroke();}
+    const R=m.size*7,glow=ctx.createRadialGradient(m.x,m.y,0,m.x,m.y,R);
+    glow.addColorStop(0,'rgba(255,255,255,'+fade+')');glow.addColorStop(.16,'rgba(255,255,255,'+(.9*fade)+')');glow.addColorStop(.3,'rgba('+m.color+','+(.85*fade)+')');glow.addColorStop(1,'rgba('+m.color+',0)');
+    ctx.fillStyle=glow;ctx.beginPath();ctx.arc(m.x,m.y,R,0,Math.PI*2);ctx.fill();
+    // 十字星芒，慢慢旋转
+    ctx.save();ctx.translate(m.x,m.y);ctx.rotate(m.spin);ctx.strokeStyle=sky.glow?'rgba(255,255,255,'+(.55*fade)+')':'rgba('+m.color+','+(.6*fade)+')';ctx.lineWidth=1.2;
+    ctx.beginPath();ctx.moveTo(-R*1.3,0);ctx.lineTo(R*1.3,0);ctx.moveTo(0,-R*1.3);ctx.lineTo(0,R*1.3);ctx.stroke();ctx.restore();
+    if(Math.random()<.8)sparkle(m.x,m.y,(Math.random()-.5)*70-m.vx*.06,(Math.random()-.5)*70-m.vy*.06,m.color,.4+Math.random()*.45,.6+Math.random()*1.3);
+    const alive=m.age<m.life&&m.y<H+40&&m.x>-60&&m.x<W+60;
+    if(!alive&&m.age>=m.life)for(let i=0;i<16;i++){const a=Math.random()*Math.PI*2,v=40+Math.random()*120;sparkle(m.x,m.y,Math.cos(a)*v+m.vx*.2,Math.sin(a)*v+m.vy*.2,i%3?m.color:'255,255,255',.5+Math.random()*.5,.8+Math.random()*1.4);}
+    return alive;
+  });
+  sky.sparks=sky.sparks.filter(p=>{
+    p.age+=dt;const a=1-p.age/p.life;if(a<=0)return false;
+    p.vy+=240*dt;p.vx*=.985;p.x+=p.vx*dt;p.y+=p.vy*dt;
+    ctx.fillStyle='rgba('+p.color+','+a+')';ctx.beginPath();ctx.arc(p.x,p.y,p.size*(.5+a*.7),0,Math.PI*2);ctx.fill();return true;
+  });
+  if(sky.items.length||sky.sparks.length)sky.raf=requestAnimationFrame(stepMeteors);
+  else{sky.raf=0;sky.canvas.remove();sky.canvas=null;sky.ctx=null;}
 }
 // 系统栏图标颜色：深色主题，或弹层打开、页面顶部压暗时，状态栏用白色图标。
 function syncSystemBars(){try{if(N&&N.systemBars)N.systemBars(state.settings.theme==='night',document.documentElement.classList.contains('sheet-open'));}catch(_){}}
@@ -575,6 +657,12 @@ const actions={
       themeWave(x,y,radius,duration,easing);
     }).catch(()=>{});
   },'pick-background':()=>N?N.pickBackground():$('#browser-background').click(),'builtin-background':()=>{if(updateSettings({background:'builtin'}))render();},'none-background':()=>{if(updateSettings({background:'none'}))render();},
+  'star-lit':b=>{
+    starLit=!starLit;b.classList.toggle('lit',starLit);b.setAttribute('aria-pressed',starLit);
+    try{localStorage.setItem('xingyu-star-lit',starLit?'1':'0');}catch(_){}
+    haptic(starLit?'confirm':'tick');if(starLit)starBurst(b);
+  },
+  meteor:b=>{haptic('soft');if(!reducedMotion()&&b.animate)b.animate([{transform:'scale(1)'},{transform:'scale(.82)',offset:.3},{transform:'scale(1.12)',offset:.7},{transform:'scale(1)'}],{duration:420,easing:'ease-out'});launchMeteor(b);},
   'course-color':b=>{courseColor=b.dataset.color;haptic('tick');document.querySelectorAll('.color-swatch').forEach(el=>{const on=el.dataset.color===courseColor;el.classList.toggle('selected',on);el.setAttribute('aria-pressed',on);});},
   delete:b=>confirmDialog('删除这项课程安排？','删除后这项安排将从本学期的课表移除。如果只是改时间，可以选择编辑。',()=>{if(persistTimetable({courses:T().courses.filter(c=>c.id!==b.dataset.id)})){closeSheet();render();toast('课程已删除');}},'删除'),
   'conflict-detail':b=>listCourses(visibleCourses().filter(c=>b.dataset.ids.split(',').includes(c.id)),'同一时段的课程'),

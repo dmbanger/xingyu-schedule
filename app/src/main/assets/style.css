@@ -269,6 +269,11 @@ dialog .button.ghost{background:var(--fill);border:0;box-shadow:none}
 .field input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:3px;background:linear-gradient(90deg,var(--accent) var(--p,50%),var(--fill) var(--p,50%))}
 .field input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:28px;height:28px;margin-top:-11px;border-radius:50%;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.18),0 0 0 .5px rgba(0,0,0,.06);transition:transform .3s var(--spring)}
 .field input[type=range]:active::-webkit-slider-thumb{transform:scale(1.12)}
+/* 防误触滑块：触摸由外层接管，页面仍能在滑块上上下滚动；按住圆钮时圆钮放大 */
+.slider{touch-action:pan-y;padding:4px 0;cursor:grab}
+.slider input[type=range]{pointer-events:none}
+.slider.dragging{cursor:grabbing}
+.slider.dragging input[type=range]::-webkit-slider-thumb{transform:scale(1.18);box-shadow:0 4px 14px rgba(0,0,0,.22),0 0 0 4px var(--accent-soft)}
 .field-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .field-row.triple{grid-template-columns:repeat(3,minmax(0,1fr))}
 .field-row .field{margin:7px 0}
@@ -314,8 +319,21 @@ dialog .button.ghost{background:var(--fill);border:0;box-shadow:none}
 .tint-green{background:linear-gradient(180deg,#4fdc72,#28c04c)}.tint-teal{background:linear-gradient(180deg,#5ad4e6,#1fb2c9)}.tint-gray{background:linear-gradient(180deg,#a9a9b3,#8a8a94)}
 .tint-red{background:linear-gradient(180deg,#ff6e66,#ff3b30)}.tint-indigo{background:linear-gradient(180deg,#8380ff,#5856d6)}
 .settings-footer{text-align:center;font-size:12px;color:var(--ink-2);text-shadow:0 0 12px var(--panel-solid),0 0 3px var(--panel-solid),0 0 1px var(--panel-solid);line-height:2;letter-spacing:.06em;margin:30px 0 10px}
-.settings-footer .footer-star{width:44px;height:44px;margin:0 auto 10px;border-radius:13px;display:grid;place-items:center;font-size:22px;color:#fff;background:linear-gradient(150deg,var(--accent-2),var(--accent));box-shadow:0 8px 20px var(--accent-shadow)}
+.settings-footer .footer-star{width:44px;height:44px;margin:0 auto 10px;border:0;padding:0;border-radius:13px;display:grid;place-items:center;font-size:22px;color:#fff;cursor:pointer;background:linear-gradient(150deg,var(--accent-2),var(--accent));box-shadow:0 8px 20px var(--accent-shadow)}
 .settings-footer .footer-sign{display:block;margin-top:4px;font-size:11px;letter-spacing:.16em;opacity:.7}
+
+/* ---------- 彩蛋：点亮的星星、星屑、流星画布 ---------- */
+.star-toggle{position:relative;border:0;padding:0;cursor:pointer;transition:transform .4s var(--spring),box-shadow .4s ease}
+.star-toggle:active{transform:scale(.88)}
+.star-toggle svg{transition:transform .7s var(--spring)}
+.star-toggle::after{content:'';position:absolute;inset:-12px;z-index:-1;border-radius:20px;background:radial-gradient(circle,rgba(255,206,84,.6),rgba(255,206,84,0) 66%);opacity:0;transform:scale(.6);transition:opacity .4s ease,transform .6s var(--spring);pointer-events:none}
+.star-toggle.lit{background:linear-gradient(150deg,#ffe58c,#ffad2e);box-shadow:0 6px 20px rgba(255,170,30,.5),inset 0 1px 0 rgba(255,255,255,.55)}
+.star-toggle.lit svg{fill:#fff;transform:rotate(72deg) scale(1.08)}
+.star-toggle.lit::after{opacity:1;transform:scale(1);animation:star-halo 2.6s ease-in-out infinite}
+@keyframes star-halo{50%{transform:scale(1.2);opacity:.65}}
+.star-spark{position:fixed;z-index:260;pointer-events:none;border-radius:50%;background:#ffd76a;box-shadow:0 0 6px 2px rgba(255,200,80,.8)}
+.meteor-sky{position:fixed;inset:0;z-index:250;width:100%;height:100%;pointer-events:none}
+.settings-footer .footer-star:active{filter:brightness(1.15)}
 
 /* ---------- 弹层（底部抽屉） ---------- */
 dialog{position:fixed;inset:auto 0 0 0;margin:0 auto;padding:0 0 var(--safe-bottom);width:100%;max-width:560px;max-height:calc(100% - var(--safe-top) - 26px);border:0;border-radius:30px 30px 0 0;color:var(--ink);background:var(--sheet-bg);box-shadow:0 -12px 48px rgba(20,10,50,.18);overflow:auto;overscroll-behavior:contain;scrollbar-width:none}
