@@ -335,6 +335,40 @@ dialog .button.ghost{background:var(--fill);border:0;box-shadow:none}
 .meteor-sky{position:fixed;inset:0;z-index:250;width:100%;height:100%;pointer-events:none}
 .settings-footer .footer-star:active{filter:brightness(1.15)}
 
+/* ---------- 彩蛋：星屿网球（横屏小游戏） ---------- */
+#tennis{position:fixed;left:0;top:0;z-index:500;transform-origin:0 0;background:#9ef3f5;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;font-family:var(--font);color:#2a2f38}
+.tennis-canvas{position:absolute;inset:0;display:block;touch-action:none}
+.tennis-score{position:absolute;top:12px;left:50%;display:flex;align-items:center;gap:10px;padding:9px 24px;border-radius:999px;background:#fff;font-size:26px;font-weight:900;line-height:1;font-variant-numeric:tabular-nums;box-shadow:0 6px 18px rgba(0,0,0,.12);opacity:0;transform:translateX(-50%) scale(.85);transition:opacity .3s ease,transform .45s var(--spring);pointer-events:none}
+.tennis-score.show{opacity:1;transform:translateX(-50%)}
+.tennis-score.show.pop{animation:tennis-pop .5s var(--spring)}
+@keyframes tennis-pop{40%{transform:translateX(-50%) scale(1.2)}}
+.tennis-score .l{color:#f0524f}.tennis-score .r{color:#2fa7e6}.tennis-score i{font-style:normal;color:#9aa3ad}
+.tennis-exit{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);border:0;border-radius:999px;padding:11px 26px;background:#fff;color:#2a2f38;font-size:17px;font-weight:900;letter-spacing:.1em;box-shadow:0 6px 18px rgba(0,0,0,.15)}
+.tennis-exit:active{transform:translateX(-50%) scale(.92)}
+#tennis.at-menu .tennis-exit{display:none}
+.tennis-back{position:absolute;top:12px;left:14px;z-index:2;border:0;border-radius:999px;padding:10px 20px;background:#fff;color:#2a2f38;font-size:16px;font-weight:800;box-shadow:0 6px 18px rgba(0,0,0,.15);transition:transform .3s var(--spring)}
+.tennis-back:active{transform:scale(.92)}
+#tennis:not(.at-menu) .tennis-back{display:none}
+.tennis-hint{position:absolute;bottom:26%;padding:10px 18px;border-radius:999px;background:rgba(255,255,255,.9);font-size:15px;font-weight:700;box-shadow:0 4px 14px rgba(0,0,0,.1);opacity:0;transition:opacity .4s ease;pointer-events:none}
+.tennis-hint.l{left:5%}.tennis-hint.r{right:5%}.tennis-hint.show{opacity:1}
+.tennis-banner{position:absolute;top:34%;left:50%;white-space:nowrap;font-size:72px;font-weight:900;line-height:1;color:#fff;text-shadow:0 5px 0 rgba(0,0,0,.18);opacity:0;transform:translate(-50%,-50%) scale(.5);transition:opacity .2s ease,transform .5s var(--spring);pointer-events:none}
+.tennis-banner.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.tennis-banner.point,.tennis-banner.win{padding:14px 30px;border-radius:999px;background:#fff;font-size:34px;text-shadow:none;box-shadow:0 10px 30px rgba(0,0,0,.18)}
+.tennis-banner.win{top:42%;padding:22px 40px;border-radius:30px;font-size:42px}
+.tennis-banner.left{color:#f0524f}.tennis-banner.right{color:#2fa7e6}
+.tennis-menu{position:absolute;inset:0;display:grid;place-items:center;padding:14px 0;background:rgba(18,40,60,.38);transition:opacity .3s ease}
+.tennis-menu[data-align=top]{align-items:start}
+.tennis-menu[data-align=bottom]{align-items:end}
+.tennis-menu.hidden{opacity:0;pointer-events:none}
+.tennis-card{width:min(420px,78%);padding:20px 24px;border-radius:28px;background:#fff;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.25)}
+.tennis-title{font-size:30px;font-weight:900;letter-spacing:.08em}
+.tennis-card p{margin:8px 0 12px;font-size:13.5px;line-height:1.6;color:#6b7280}
+.tennis-card p b{color:#f07a1a}
+.tennis-card button{display:block;width:100%;margin-top:9px;border:0;border-radius:18px;padding:11px;font-size:18px;font-weight:800;color:#fff;background:linear-gradient(180deg,#ff6b63,#f0524f);box-shadow:0 6px 16px rgba(240,82,79,.3);transition:transform .3s var(--spring)}
+.tennis-card button:active{transform:scale(.95)}
+.tennis-card button[data-mode=duo]{background:linear-gradient(180deg,#4cbdf2,#2fa7e6);box-shadow:0 6px 16px rgba(47,167,230,.3)}
+.tennis-card button small{display:block;margin-top:3px;font-size:12px;font-weight:600;opacity:.88}
+
 /* ---------- 弹层（底部抽屉） ---------- */
 dialog{position:fixed;inset:auto 0 0 0;margin:0 auto;padding:0 0 var(--safe-bottom);width:100%;max-width:560px;max-height:calc(100% - var(--safe-top) - 26px);border:0;border-radius:30px 30px 0 0;color:var(--ink);background:var(--sheet-bg);box-shadow:0 -12px 48px rgba(20,10,50,.18);overflow:auto;overscroll-behavior:contain;scrollbar-width:none}
 dialog::-webkit-scrollbar{display:none}

@@ -3,6 +3,7 @@ package app.xingyu.schedule;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
@@ -54,7 +55,7 @@ public final class MainActivity extends Activity {
     private String mobileUserAgent;
     private String pendingExport = "";
     private int insetTop, insetBottom;
-    private boolean darkTheme;
+    private boolean darkTheme, gameOn;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -77,7 +78,8 @@ public final class MainActivity extends Activity {
                 ime=insets.getSystemWindowInsetBottom()>bottom?insets.getSystemWindowInsetBottom():0;
             }
             // 键盘弹出时整页上移到键盘之上（相当于 adjustResize），此时网页底部不用再给手势条留白。
-            v.setPadding(left,0,right,ime);
+            // 网球彩蛋横屏时铺满整屏，不给摄像头开孔留边
+            v.setPadding(gameOn?0:left,0,gameOn?0:right,ime);
             insetTop=top;insetBottom=ime>0?0:bottom;
             if(schoolPanel!=null)schoolPanel.setPadding(0,top,0,ime>0?0:bottom);
             pushInsets();
@@ -139,6 +141,21 @@ public final class MainActivity extends Activity {
         }
         root.setBackgroundColor(navDark?Color.rgb(20,18,32):Color.rgb(247,245,253));
     }
+    private void setGameMode(boolean on){
+        gameOn=on;root.requestApplyInsets();
+        setRequestedOrientation(on?ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE:ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+        if(on)getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        else getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            android.view.WindowInsetsController c=getWindow().getInsetsController();
+            if(on){c.setSystemBarsBehavior(android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);c.hide(WindowInsets.Type.systemBars());}
+            else c.show(WindowInsets.Type.systemBars());
+        } else {
+            int flags=View.SYSTEM_UI_FLAG_LAYOUT_STABLE|View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN|View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
+            getWindow().getDecorView().setSystemUiVisibility(on?flags|View.SYSTEM_UI_FLAG_FULLSCREEN|View.SYSTEM_UI_FLAG_HIDE_NAVIGATION|View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY:flags);
+            if(!on)setDarkBars(darkTheme);
+        }
+    }
     private int hapticConstant(String kind){
         int sdk=android.os.Build.VERSION.SDK_INT;
         if("confirm".equals(kind))return sdk>=30?HapticFeedbackConstants.CONFIRM:HapticFeedbackConstants.CONTEXT_CLICK;
@@ -161,6 +178,8 @@ public final class MainActivity extends Activity {
         @JavascriptInterface public void openSchool(String url){runOnUiThread(()->showSchool(url));}
         @JavascriptInterface public String insets(){return insetsText();}
         @JavascriptInterface public void systemBars(boolean dark,boolean sheetOpen){runOnUiThread(()->{darkTheme=dark;if(schoolPanel==null||schoolPanel.getVisibility()!=View.VISIBLE)setDarkBars(dark||sheetOpen,dark);});}
+        // 网球彩蛋：进入时横屏、隐藏系统栏、保持亮屏，退出时全部恢复
+        @JavascriptInterface public void gameMode(boolean on){runOnUiThread(()->setGameMode(on));}
         @JavascriptInterface public void haptic(String kind){runOnUiThread(()->appView.performHapticFeedback(hapticConstant(kind)));}
         @JavascriptInterface public void clearSchoolSession(){runOnUiThread(()->{if(schoolView!=null){root.removeView(schoolPanel);schoolView.clearCache(true);schoolView.clearHistory();schoolView.destroy();schoolView=null;schoolPanel=null;}CookieManager.getInstance().removeAllCookies(ok->message("教务网站登录状态已清除"));android.webkit.WebStorage.getInstance().deleteAllData();});}
     }
