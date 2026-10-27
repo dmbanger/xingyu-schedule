@@ -37,6 +37,8 @@ svg{flex:none}
    壁纸和柔光各自是独立图层，加圆角不会让 5MB 的壁纸重新绘制一遍；圆角也不做过渡。 */
 #scene{position:fixed;inset:0;pointer-events:none;overflow:hidden;transform-origin:50% 0;will-change:transform;transition:transform .55s var(--ios)}
 #wallpaper,.veil{position:absolute;inset:0;will-change:transform}
+/* 背景通透度：--clarity 为 0–1，柔光层最低保留 10% */
+.veil{opacity:calc(1 - var(--clarity,0) * .9)}
 #wallpaper{background:linear-gradient(155deg,#dfe6fb 0%,#e6ddf4 45%,#f6e3ea 100%);background-size:cover;background-position:center}
 .veil{background:linear-gradient(180deg,rgba(248,246,255,.86),rgba(248,246,255,.42) 38%,rgba(248,246,255,.7))}
 #app{position:relative;height:100%;max-width:1080px;margin:auto;overflow:hidden;transform-origin:50% 0;will-change:transform;transition:transform .55s var(--ios)}
@@ -187,7 +189,8 @@ dialog .button.ghost{background:var(--fill);border:0;box-shadow:none}
 .week-track-page{position:absolute;top:0;pointer-events:none}
 /* 日期栏吸附在顶栏下方。Chrome 的 sticky 以滚动容器的内边距边缘为基准，#content 顶部已经留出了顶栏高度，
    所以这里只需 -2px 贴住顶栏；沉浸模式顶栏收起后再上移一个顶栏高度。 */
-.day-header{position:sticky;top:var(--sticky-top);z-index:6;display:grid;grid-template-columns:var(--label-col) repeat(7,minmax(0,1fr));align-items:center;height:54px;background:var(--day-bg);box-shadow:0 .5px 0 var(--line),0 8px 18px rgba(40,28,90,.05);transition:top .5s var(--ios)}
+.day-header{position:sticky;top:var(--sticky-top);z-index:6;display:grid;grid-template-columns:var(--label-col) repeat(7,minmax(0,1fr));align-items:center;height:54px;background:var(--panel);box-shadow:0 .5px 0 var(--line);transition:top .5s var(--ios),background-color .25s ease,box-shadow .25s ease}
+#content.stuck .day-header{background:var(--day-bg);box-shadow:0 .5px 0 var(--line),0 8px 18px rgba(40,28,90,.06)}
 .day{display:grid;justify-items:center;gap:3px;color:var(--muted);font-size:11px;font-weight:600;padding:5px 0;border-radius:12px}
 .day span{width:25px;height:25px;border-radius:50%;display:grid;place-items:center;font-size:13.5px;font-weight:650;color:var(--ink);font-variant-numeric:tabular-nums;transition:transform .4s var(--spring)}
 .day-header .day:nth-child(n+7) span{color:var(--muted)}
@@ -398,6 +401,10 @@ body[data-theme=night] .notice.warning{color:#ffcf7a}
 body[data-theme=night] .notice.error{color:#ff8a82}
 body[data-theme=night] .button.danger{color:#ff7a72}
 
+/* ---------- 背景通透度：网格底色随 --clarity 变淡；数值较高时（body.clear）压在壁纸上的文字加一圈同色柔光 ---------- */
+body{--grid-bg:rgba(255,255,255,calc(.34 - var(--clarity,0) * .26))}
+body[data-theme=night]{--grid-bg:rgba(16,14,30,calc(.3 - var(--clarity,0) * .18))}
+body.clear :is(.month-label,.eyebrow,.page-title,.subtitle,.section-title,.period-label,.below-grid,.period-title,.settings-footer){text-shadow:0 0 10px var(--panel-solid),0 0 3px var(--panel-solid),0 0 1px var(--panel-solid)}
 /* ---------- 宽屏与小屏 ---------- */
 @media(min-width:700px){
   .app-header{padding-left:32px;padding-right:32px}

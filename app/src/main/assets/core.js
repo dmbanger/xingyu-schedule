@@ -53,8 +53,8 @@
   function parseDate(s){if(!/^\d{4}-\d{2}-\d{2}$/.test(s||''))throw new Error('日期格式无效');const [y,m,d]=s.split('-').map(Number),v=new Date(y,m-1,d);if(dateString(v)!==s)throw new Error('日期无效');return v;}
   function weekAt(start,now=new Date()){const a=monday(parseDate(start)),b=monday(now);return Math.round((Date.UTC(b.getFullYear(),b.getMonth(),b.getDate())-Date.UTC(a.getFullYear(),a.getMonth(),a.getDate()))/604800000)+1;}
   const STATE_VERSION=3;
-  const DEFAULT_TIMES=['08:00-08:45','08:50-09:35','09:50-10:35','10:40-11:25','11:30-12:15','13:30-14:15','14:20-15:05','15:20-16:05','16:10-16:55','18:30-19:15','19:20-20:05','20:10-20:55'];
-  function defaultSettings(){return {schoolName:'我的学校',schoolUrl:'',schoolPreset:'generic',theme:'starlight',background:'builtin',cardOpacity:88};}
+  const DEFAULT_TIMES=['08:00-08:45','08:50-09:35','09:50-10:35','10:40-11:25','11:30-12:15','12:20-13:05','13:10-13:55','14:00-14:45','14:50-15:35','15:50-16:35','16:40-17:25','17:30-18:15','18:20-19:05','19:30-20:15','20:20-21:05','21:10-21:55'];
+  function defaultSettings(){return {schoolName:'我的学校',schoolUrl:'',schoolPreset:'generic',theme:'starlight',background:'builtin',cardOpacity:88,wallpaperClarity:0};}
   function tid(){return 't'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
   // "2026 秋季学期" style names, derived from the first Monday of the semester.
   function semesterName(dateValue){
@@ -66,7 +66,7 @@
   }
   function defaultTimetable(){
     const start=dateString(monday());
-    return {id:tid(),name:semesterName(start),semesterStart:start,semesterConfigured:false,totalWeeks:20,periods:12,times:DEFAULT_TIMES.slice(),courses:[]};
+    return {id:tid(),name:semesterName(start),semesterStart:start,semesterConfigured:false,totalWeeks:20,periods:DEFAULT_TIMES.length,times:DEFAULT_TIMES.slice(),courses:[]};
   }
   function defaultState(){const t=defaultTimetable();return {version:STATE_VERSION,activeId:t.id,timetables:[t],settings:defaultSettings()};}
   function sanitizeTimetable(raw,index){
@@ -79,6 +79,8 @@
     t.name=(typeof raw.name==='string'?raw.name.trim():'').slice(0,40)||semesterName(t.semesterStart);
     for(const [key,min,max] of [['totalWeeks',1,40],['periods',1,24]])if(Number.isInteger(Number(raw[key]))&&Number(raw[key])>=min&&Number(raw[key])<=max)t[key]=Number(raw[key]);
     if(Array.isArray(raw.times)&&raw.times.length<=24&&raw.times.every(validTimeRange))t.times=raw.times.slice();
+    // 只存了作息没存节次数的旧数据，节次数不能多于作息行数
+    if(raw.periods===undefined&&t.times.length<t.periods)t.periods=t.times.length;
     t.courses=normalizeCourses(raw.courses||[]);
     return t;
   }
@@ -87,6 +89,8 @@
     if(['starlight','sakura','night'].includes(s.theme))target.theme=s.theme;
     if(['builtin','custom','none'].includes(s.background))target.background=s.background;
     if(Number.isInteger(Number(s.cardOpacity))&&Number(s.cardOpacity)>=35&&Number(s.cardOpacity)<=100)target.cardOpacity=Number(s.cardOpacity);
+    // 背景通透度 0–100：0 为原来的柔光，越大壁纸越清晰
+    if(Number.isInteger(Number(s.wallpaperClarity))&&Number(s.wallpaperClarity)>=0&&Number(s.wallpaperClarity)<=100)target.wallpaperClarity=Number(s.wallpaperClarity);
     if(SCHOOL_PRESETS.some(p=>p.id===s.schoolPreset))target.schoolPreset=s.schoolPreset;
   }
   // Pre-0.2.0 installs carried one school name and URL as the built-in default.

@@ -291,6 +291,18 @@ test('旧版单课表升级为一张课表，课程、学期与作息一起迁�
   assert.equal(migrated.settings.schoolName,'某某大学');
   assert.equal(migrated.activeId,t.id);
 });
+test('背景通透度：默认 0，0–100 的整数原样保存，越界或非数字忽略',()=>{
+  assert.equal(C.defaultState().settings.wallpaperClarity,0);
+  assert.equal(C.sanitizeState({version:3,settings:{wallpaperClarity:65},timetables:[]}).settings.wallpaperClarity,65);
+  assert.equal(C.sanitizeState({version:3,settings:{wallpaperClarity:150},timetables:[]}).settings.wallpaperClarity,0);
+  assert.equal(C.sanitizeState({version:3,settings:{wallpaperClarity:'很通透'},timetables:[]}).settings.wallpaperClarity,0);
+});
+test('默认作息为 16 节，节次数与作息行数一致',()=>{
+  const t=C.defaultState().timetables[0];
+  assert.equal(t.times.length,16);assert.equal(t.periods,16);
+  assert.equal(t.times[5],'12:20-13:05');assert.equal(t.times[15],'21:10-21:55');
+  assert.ok(t.times.every(C.validTimeRange));
+});
 test('多张课表：各自保留课程与学期，activeId 决定当前课表',()=>{
   const raw={version:3,activeId:'tb',timetables:[
     {id:'ta',name:'2026 秋季学期',semesterStart:'2026-09-07',semesterConfigured:true,totalWeeks:18,periods:12,times:['08:00-08:45'],courses:[{name:'高等数学',day:1,start:1,end:2,weeks:'1-16'}]},
